@@ -23,6 +23,7 @@ class RecentExpensesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recent = transactions.take(4).toList();
+    final colors = context.appColors;
 
     return Column(
       children: [
@@ -32,12 +33,12 @@ class RecentExpensesList extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 AppStrings.recentExpenses,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: colors.textPrimary,
                 ),
               ),
               GestureDetector(
@@ -45,21 +46,21 @@ class RecentExpensesList extends StatelessWidget {
                   HapticUtil.selection();
                   onViewAll?.call();
                 },
-                child: const Row(
+                child: Row(
                   children: [
                     Text(
                       AppStrings.viewAll,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
+                        color: colors.textSecondary,
                       ),
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Icon(
                       Icons.arrow_forward_rounded,
                       size: 14,
-                      color: AppColors.textSecondary,
+                      color: colors.textSecondary,
                     ),
                   ],
                 ),
@@ -75,74 +76,84 @@ class RecentExpensesList extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: colors.card,
               borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: colors.border),
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              itemCount: recent.length,
-              separatorBuilder: (_, _) => const Divider(
-                color: AppColors.borderLight,
-                height: 1,
-                indent: 64,
-                endIndent: 16,
-              ),
-              itemBuilder: (context, index) {
-                final item = recent[index];
-                final category = CategoryItem.getById(item.categoryId);
+            child: recent.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        'Hozircha xarajat yo\'q',
+                        style: TextStyle(color: colors.textSecondary, fontSize: 13),
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    itemCount: recent.length,
+                    separatorBuilder: (_, _) => Divider(
+                      color: colors.border,
+                      height: 1,
+                      indent: 64,
+                      endIndent: 16,
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = recent[index];
+                      final category = CategoryItem.getById(item.categoryId);
 
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppDimensions.space16,
-                    vertical: 2,
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.space16,
+                          vertical: 2,
+                        ),
+                        onTap: () {
+                          HapticUtil.light();
+                          onItemTap?.call(item);
+                        },
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: category.backgroundColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            category.icon,
+                            color: category.iconColor,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          item.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${category.name} • ${DateFormatter.formatRelativeTime(item.dateTime)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                        trailing: Text(
+                          '${item.isExpense ? '-' : '+ '}${CurrencyFormatter.format(item.amount)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: item.isExpense ? colors.textPrimary : colors.income,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  onTap: () {
-                    HapticUtil.light();
-                    onItemTap?.call(item);
-                  },
-                  leading: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: category.backgroundColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      category.icon,
-                      color: category.iconColor,
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${category.name} • ${DateFormatter.formatRelativeTime(item.dateTime)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  trailing: Text(
-                    CurrencyFormatter.format(item.amount),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                );
-              },
-            ),
           ),
         ),
       ],

@@ -6,7 +6,7 @@ import '../../../core/utils/haptic_feedback_util.dart';
 
 class MonthlyBarData {
   final String monthLabel;
-  final double amount;
+  final num amount;
   final bool isSelected;
 
   const MonthlyBarData({
@@ -34,11 +34,12 @@ class _AnimatedBarChartWidgetState extends State<AnimatedBarChartWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  int _selectedIndex = 5; // default to last month (Sep)
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.data.isNotEmpty ? widget.data.length - 1 : 0;
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -51,6 +52,14 @@ class _AnimatedBarChartWidgetState extends State<AnimatedBarChartWidget>
   }
 
   @override
+  void didUpdateWidget(covariant AnimatedBarChartWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.data.length != oldWidget.data.length) {
+      _selectedIndex = widget.data.isNotEmpty ? widget.data.length - 1 : 0;
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -59,6 +68,7 @@ class _AnimatedBarChartWidgetState extends State<AnimatedBarChartWidget>
   @override
   Widget build(BuildContext context) {
     if (widget.data.isEmpty) return const SizedBox.shrink();
+    final colors = context.appColors;
 
     final maxVal = widget.data
         .map((e) => e.amount)
@@ -76,7 +86,7 @@ class _AnimatedBarChartWidgetState extends State<AnimatedBarChartWidget>
               final item = widget.data[index];
               final isCurrent = index == _selectedIndex;
               final normalizedHeight = maxVal > 0 ? (item.amount / maxVal) : 0.0;
-              final barHeight = (normalizedHeight * 110.0 * _animation.value).clamp(12.0, 110.0);
+              final barHeight = (normalizedHeight * 110.0 * _animation.value).clamp(8.0, 110.0);
 
               return GestureDetector(
                 onTap: () {
@@ -106,7 +116,7 @@ class _AnimatedBarChartWidgetState extends State<AnimatedBarChartWidget>
                           ],
                         ),
                         child: Text(
-                          CurrencyFormatter.format(item.amount, includeSymbol: false),
+                          CurrencyFormatter.formatCompact(item.amount),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -125,20 +135,20 @@ class _AnimatedBarChartWidgetState extends State<AnimatedBarChartWidget>
                       decoration: BoxDecoration(
                         color: isCurrent
                             ? AppColors.primary
-                            : AppColors.chartBarInactive,
+                            : colors.chartInactive,
                         borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
                       ),
                     ),
 
                     const SizedBox(height: 8),
 
-                    // Month label (e.g. Apr, May, Jun, Jul, Aug, Sep)
+                    // Month label
                     Text(
                       item.monthLabel,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                        color: isCurrent ? AppColors.textPrimary : AppColors.textSecondary,
+                        color: isCurrent ? colors.textPrimary : colors.textSecondary,
                       ),
                     ),
                   ],

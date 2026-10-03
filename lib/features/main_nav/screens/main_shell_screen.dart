@@ -1,55 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../../dashboard/screens/dashboard_screen.dart';
-import '../../transactions/screens/transactions_screen.dart';
-import '../../statistics/screens/statistics_screen.dart';
-import '../../profile/screens/profile_screen.dart';
+import '../../../core/widgets/app_bottom_sheets.dart';
 
-class MainShellScreen extends StatefulWidget {
-  final int initialIndex;
+class MainShellScreen extends ConsumerWidget {
+  final StatefulNavigationShell navigationShell;
 
   const MainShellScreen({
     super.key,
-    this.initialIndex = 0,
+    required this.navigationShell,
   });
 
   @override
-  State<MainShellScreen> createState() => _MainShellScreenState();
-}
-
-class _MainShellScreenState extends State<MainShellScreen> {
-  late int _currentIndex;
-
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    TransactionsScreen(),
-    StatisticsScreen(),
-    ProfileScreen(),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: navigationShell,
       bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: _currentIndex,
+        currentIndex: navigationShell.currentIndex,
         onTabSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          navigationShell.goBranch(
+            index,
+            initialLocation: index == navigationShell.currentIndex,
+          );
         },
         onAddPressed: () {
-          context.push('/add-transaction');
+          // Native Material 3 Bottom Sheet for fast transaction creation
+          showAddEditTransactionSheet(context, ref);
         },
       ),
     );

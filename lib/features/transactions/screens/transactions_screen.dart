@@ -6,6 +6,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
+import '../../../core/widgets/app_bottom_sheets.dart';
 import '../../../data/models/category_item.dart';
 import '../../../providers/finance_providers.dart';
 
@@ -18,6 +19,7 @@ class TransactionsScreen extends ConsumerStatefulWidget {
 
 class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   String _selectedCategoryFilter = 'all';
+  String _selectedTypeFilter = 'all'; // 'all', 'expense', 'income'
   String _searchQuery = '';
   bool _isSearchOpen = false;
   final TextEditingController _searchController = TextEditingController();
@@ -30,73 +32,78 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
   void _nextMonth() {
     HapticUtil.selection();
-    final current = ref.read(selectedDateFilterProvider);
-    ref.read(selectedDateFilterProvider.notifier).state =
-        DateTime(current.year, current.month + 1, 1);
+    ref.read(selectedDateFilterProvider.notifier).nextMonth();
   }
 
   void _prevMonth() {
     HapticUtil.selection();
-    final current = ref.read(selectedDateFilterProvider);
-    ref.read(selectedDateFilterProvider.notifier).state =
-        DateTime(current.year, current.month - 1, 1);
+    ref.read(selectedDateFilterProvider.notifier).prevMonth();
   }
 
   @override
   Widget build(BuildContext context) {
     final transactions = ref.watch(transactionsProvider);
     final selectedDate = ref.watch(selectedDateFilterProvider);
+    final colors = context.appColors;
 
-    // Filter transactions by month, category, and query
+    // Filter transactions by month, category, type, and query
     final filtered = transactions.where((t) {
       final matchesMonth = t.dateTime.month == selectedDate.month &&
           t.dateTime.year == selectedDate.year;
       final matchesCategory =
           _selectedCategoryFilter == 'all' || t.categoryId == _selectedCategoryFilter;
+      final matchesType = _selectedTypeFilter == 'all' ||
+          (_selectedTypeFilter == 'expense' && t.isExpense) ||
+          (_selectedTypeFilter == 'income' && t.isIncome);
       final matchesQuery = _searchQuery.isEmpty ||
           t.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           (t.note?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
-      return matchesMonth && matchesCategory && matchesQuery;
+      return matchesMonth && matchesCategory && matchesType && matchesQuery;
     }).toList();
 
     // Summary calculations
-    final totalSpent = filtered.where((t) => t.isExpense).fold<double>(
-          0.0,
+    final totalSpent = filtered.where((t) => t.isExpense).fold<int>(
+          0,
+          (sum, t) => sum + t.amount,
+        );
+    final totalEarned = filtered.where((t) => t.isIncome).fold<int>(
+          0,
           (sum, t) => sum + t.amount,
         );
     final daysInMonth = DateTime(selectedDate.year, selectedDate.month + 1, 0).day;
-    final dailyAvg = totalSpent > 0 ? (totalSpent / daysInMonth) : 0.0;
+    final dailyAvg = totalSpent > 0 ? (totalSpent / daysInMonth).round() : 0;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
         title: _isSearchOpen
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
                 onChanged: (v) => setState(() => _searchQuery = v),
+                style: TextStyle(color: colors.textPrimary),
                 decoration: InputDecoration(
                   hintText: AppStrings.searchHint,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   filled: false,
-                  hintStyle: const TextStyle(color: AppColors.textTertiary),
+                  hintStyle: TextStyle(color: colors.textTertiary),
                 ),
               )
-            : const Text(
+            : Text(
                 AppStrings.navExpenses,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: colors.textPrimary,
                 ),
               ),
         actions: [
           IconButton(
             icon: Icon(
               _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
-              color: AppColors.textPrimary,
+              color: colors.textPrimary,
             ),
             onPressed: () {
               HapticUtil.selection();
@@ -110,7 +117,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.tune_rounded, color: AppColors.textPrimary),
+            icon: Icon(Icons.tune_rounded, color: colors.textPrimary),
             onPressed: () {
               HapticUtil.selection();
               _showFilterModal(context);
@@ -121,7 +128,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // Month Selector: "<   Sentabr 2025 v   >"
+          // Month Selector: "<   Sentabr 2026 v   >"
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(
@@ -133,7 +140,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left_rounded, size: 28),
-                    color: AppColors.textPrimary,
+                    color: colors.textPrimary,
                     onPressed: _prevMonth,
                   ),
                   InkWell(
@@ -145,17 +152,17 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         children: [
                           Text(
                             DateFormatter.formatMonthYear(selectedDate),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                              color: colors.textPrimary,
                             ),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(
+                          Icon(
                             Icons.keyboard_arrow_down_rounded,
                             size: 18,
-                            color: AppColors.textSecondary,
+                            color: colors.textSecondary,
                           ),
                         ],
                       ),
@@ -163,7 +170,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right_rounded, size: 28),
-                    color: AppColors.textPrimary,
+                    color: colors.textPrimary,
                     onPressed: _nextMonth,
                   ),
                 ],
@@ -171,7 +178,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             ),
           ),
 
-          // Two Metric Cards: "Jami xarajatlar" & "O'rtacha kunlik"
+          // Two Metric Cards: "Jami xarajatlar" & "O'rtacha kunlik" (or Kirim)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
@@ -182,45 +189,52 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(AppDimensions.space16),
                       decoration: BoxDecoration(
-                        color: AppColors.card,
+                        color: colors.card,
                         borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: colors.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             AppStrings.totalExpenses,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary,
+                              color: colors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             CurrencyFormatter.format(totalSpent),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                              color: colors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Row(
+                          Row(
                             children: [
                               Icon(
                                 Icons.arrow_downward_rounded,
                                 size: 12,
-                                color: AppColors.income,
+                                color: colors.income,
                               ),
-                              SizedBox(width: 2),
+                              const SizedBox(width: 2),
                               Text(
-                                '12%',
+                                totalEarned > 0 ? '+${CurrencyFormatter.formatCompact(totalEarned)} kirim' : '12% past',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.income,
+                                  color: colors.income,
                                 ),
                               ),
                             ],
@@ -237,9 +251,16 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(AppDimensions.space16),
                       decoration: BoxDecoration(
-                        color: AppColors.card,
+                        color: colors.card,
                         borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: colors.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,33 +268,21 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 AppStrings.dailyAverage,
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
-                                  color: AppColors.textSecondary,
+                                  color: colors.textSecondary,
                                 ),
                               ),
                               Row(
                                 children: [
-                                  Container(
-                                    width: 3,
-                                    height: 8,
-                                    color: AppColors.income,
-                                  ),
+                                  Container(width: 3, height: 8, color: colors.income),
                                   const SizedBox(width: 2),
-                                  Container(
-                                    width: 3,
-                                    height: 12,
-                                    color: AppColors.income,
-                                  ),
+                                  Container(width: 3, height: 12, color: colors.income),
                                   const SizedBox(width: 2),
-                                  Container(
-                                    width: 3,
-                                    height: 16,
-                                    color: AppColors.income,
-                                  ),
+                                  Container(width: 3, height: 16, color: colors.income),
                                 ],
                               ),
                             ],
@@ -281,10 +290,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                           const SizedBox(height: 8),
                           Text(
                             CurrencyFormatter.format(dailyAvg),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                              color: colors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 18),
@@ -321,26 +330,55 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
 
           // Transaction Items List
           if (filtered.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.receipt_long_outlined,
-                      size: 48,
-                      color: AppColors.textTertiary,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Bu davr uchun xarajatlar topilmadi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceVariant,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.receipt_long_outlined,
+                          size: 40,
+                          color: colors.textTertiary,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      Text(
+                        'Hozircha xarajat yo\'q',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Bugungi xarajatlaringizni yozib boring — oy oxirida pulingiz qayerga ketganini aniq ko\'rasiz.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: colors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          showAddEditTransactionSheet(context, ref);
+                        },
+                        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                        label: const Text('Xarajat qo\'shish'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             )
@@ -360,78 +398,104 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         decoration: BoxDecoration(
-                          color: AppColors.expense,
+                          color: colors.expense,
                           borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
                         ),
                         alignment: Alignment.centerRight,
                         child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
                       ),
+                      confirmDismiss: (direction) async {
+                        return await showConfirmSheet(
+                          context: context,
+                          title: 'Tranzaksiyani o\'chirish',
+                          message: '"${item.title}" xarajati butunlay o\'chiriladi. Rozimisiz?',
+                          confirmLabel: 'O\'chirish',
+                          isDestructive: true,
+                          icon: Icons.delete_outline_rounded,
+                        );
+                      },
                       onDismissed: (_) {
                         HapticUtil.medium();
                         ref.read(transactionsProvider.notifier).deleteTransaction(item.id);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Xarajat o\'chirildi'),
+                          SnackBar(
+                            content: const Text('Xarajat o\'chirildi'),
+                            backgroundColor: colors.expense,
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
                       },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(AppDimensions.space16),
-                        decoration: BoxDecoration(
-                          color: AppColors.card,
-                          borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: cat.backgroundColor,
-                                shape: BoxShape.circle,
+                      child: InkWell(
+                        onTap: () {
+                          HapticUtil.light();
+                          // Instant edit bottom sheet
+                          showAddEditTransactionSheet(context, ref, existingItem: item);
+                        },
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(AppDimensions.space16),
+                          decoration: BoxDecoration(
+                            color: colors.card,
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                            border: Border.all(color: colors.border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
                               ),
-                              child: Icon(
-                                cat.icon,
-                                color: cat.iconColor,
-                                size: 22,
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: cat.backgroundColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  cat.icon,
+                                  color: cat.iconColor,
+                                  size: 22,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: AppDimensions.space12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.title,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary,
+                              const SizedBox(width: AppDimensions.space12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.title,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.textPrimary,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${cat.name} • ${DateFormatter.formatRelativeTime(item.dateTime)}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${cat.name} • ${DateFormatter.formatRelativeTime(item.dateTime)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colors.textSecondary,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            Text(
-                              '${item.isExpense ? '' : '+ '}${CurrencyFormatter.format(item.amount)}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: item.isExpense ? AppColors.textPrimary : AppColors.income,
+                              Text(
+                                '${item.isExpense ? '-' : '+ '}${CurrencyFormatter.format(item.amount)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: item.isExpense ? colors.textPrimary : colors.income,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -448,6 +512,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   }
 
   Widget _filterChip(String id, String label) {
+    final colors = context.appColors;
     final isSelected = _selectedCategoryFilter == id;
     return GestureDetector(
       onTap: () {
@@ -460,10 +525,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.card,
+          color: isSelected ? AppColors.primary : colors.card,
           borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
+            color: isSelected ? AppColors.primary : colors.border,
           ),
         ),
         child: Center(
@@ -472,7 +537,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isSelected ? Colors.white : AppColors.textSecondary,
+              color: isSelected ? Colors.white : colors.textSecondary,
             ),
           ),
         ),
@@ -481,49 +546,50 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   }
 
   void _pickMonth(BuildContext context, DateTime current) {
-    showModalBottomSheet(
+    final colors = context.appColors;
+    showAppModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Oyni tanlang',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Oyni tanlang',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
                 ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: List.generate(12, (index) {
-                    final monthIndex = index + 1;
-                    final isCurrent = current.month == monthIndex;
-                    return ChoiceChip(
-                      label: Text(DateFormatter.uzbekMonths[index]),
-                      selected: isCurrent,
-                      selectedColor: AppColors.primary,
-                      labelStyle: TextStyle(
-                        color: isCurrent ? Colors.white : AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      onSelected: (_) {
-                        ref.read(selectedDateFilterProvider.notifier).state =
-                            DateTime(current.year, monthIndex, 1);
-                        Navigator.pop(context);
-                      },
-                    );
-                  }),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: List.generate(12, (index) {
+                  final monthIndex = index + 1;
+                  final isCurrent = current.month == monthIndex;
+                  return ChoiceChip(
+                    label: Text(DateFormatter.uzbekMonths[index]),
+                    selected: isCurrent,
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(
+                      color: isCurrent ? Colors.white : colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    onSelected: (_) {
+                      ref.read(selectedDateFilterProvider.notifier).setDate(
+                            DateTime(current.year, monthIndex, 1),
+                          );
+                      Navigator.pop(context);
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 12),
+            ],
           ),
         );
       },
@@ -531,42 +597,54 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   }
 
   void _showFilterModal(BuildContext context) {
-    showModalBottomSheet(
+    final colors = context.appColors;
+    showAppModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Filtr va tartiblash',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Filtr va tartiblash',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
                 ),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.arrow_downward_rounded),
-                  title: const Text('Eng yuqori summadan'),
-                  onTap: () => Navigator.pop(context),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.arrow_upward_rounded),
-                  title: const Text('Eng past summadan'),
-                  onTap: () => Navigator.pop(context),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.calendar_today_rounded),
-                  title: const Text('Eng yangi sanadan'),
-                  onTap: () => Navigator.pop(context),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Icon(Icons.all_inclusive_rounded, color: colors.textSecondary),
+                title: Text('Barcha tranzaksiyalar', style: TextStyle(color: colors.textPrimary)),
+                trailing: _selectedTypeFilter == 'all' ? const Icon(Icons.check_rounded, color: AppColors.primary) : null,
+                onTap: () {
+                  setState(() => _selectedTypeFilter = 'all');
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.arrow_downward_rounded, color: colors.expense),
+                title: Text('Faqat chiqimlar', style: TextStyle(color: colors.textPrimary)),
+                trailing: _selectedTypeFilter == 'expense' ? const Icon(Icons.check_rounded, color: AppColors.primary) : null,
+                onTap: () {
+                  setState(() => _selectedTypeFilter = 'expense');
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.arrow_upward_rounded, color: colors.income),
+                title: Text('Faqat kirimlar', style: TextStyle(color: colors.textPrimary)),
+                trailing: _selectedTypeFilter == 'income' ? const Icon(Icons.check_rounded, color: AppColors.primary) : null,
+                onTap: () {
+                  setState(() => _selectedTypeFilter = 'income');
+                  Navigator.pop(context);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
           ),
         );
       },

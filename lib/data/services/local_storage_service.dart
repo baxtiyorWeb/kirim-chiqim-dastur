@@ -1,17 +1,20 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/transaction_item.dart';
 import '../models/debt_item.dart';
 import '../models/budget_model.dart';
 import '../models/savings_goal.dart';
+import '../models/category_item.dart';
 
 class LocalStorageService {
   static const String _transactionsKey = 'app_transactions';
   static const String _debtsKey = 'app_debts';
   static const String _budgetKey = 'app_budget';
   static const String _goalsKey = 'app_goals';
-  static const String _balanceKey = 'app_balance';
+  static const String _initialBalanceKey = 'app_initial_balance';
   static const String _hasSeenOnboardingKey = 'has_seen_onboarding';
+  static const String _themeModeKey = 'app_theme_mode';
 
   final SharedPreferences _prefs;
 
@@ -22,16 +25,28 @@ class LocalStorageService {
     return LocalStorageService(prefs);
   }
 
+  // Onboarding
   bool get hasSeenOnboarding => _prefs.getBool(_hasSeenOnboardingKey) ?? false;
-
   Future<void> setHasSeenOnboarding(bool value) async {
     await _prefs.setBool(_hasSeenOnboardingKey, value);
   }
 
-  double get balance => _prefs.getDouble(_balanceKey) ?? 750000.0;
+  // Theme Mode
+  ThemeMode get themeMode {
+    final modeStr = _prefs.getString(_themeModeKey);
+    if (modeStr == 'light') return ThemeMode.light;
+    if (modeStr == 'dark') return ThemeMode.dark;
+    return ThemeMode.system;
+  }
 
-  Future<void> setBalance(double value) async {
-    await _prefs.setDouble(_balanceKey, value);
+  Future<void> setThemeMode(ThemeMode mode) async {
+    await _prefs.setString(_themeModeKey, mode.name);
+  }
+
+  // Base Initial Balance (Opening balance)
+  int get initialBalance => _prefs.getInt(_initialBalanceKey) ?? 750000;
+  Future<void> setInitialBalance(int value) async {
+    await _prefs.setInt(_initialBalanceKey, value);
   }
 
   // Transactions
@@ -102,13 +117,24 @@ class LocalStorageService {
     await _prefs.setString(_goalsKey, encoded);
   }
 
-  // Default seeded data matching reference design
+  // Secure Account Reset (Purge local data)
+  Future<void> clearAllData() async {
+    await _prefs.remove(_transactionsKey);
+    await _prefs.remove(_debtsKey);
+    await _prefs.remove(_budgetKey);
+    await _prefs.remove(_goalsKey);
+    await _prefs.remove(_initialBalanceKey);
+    await _prefs.remove(_hasSeenOnboardingKey);
+  }
+
+  // Default seeded data matching reference fintech design
   static final List<TransactionItem> _defaultTransactions = [
     TransactionItem(
       id: 'tx_1',
       title: 'Nonushta',
       amount: 28000,
       categoryId: 'food',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(minutes: 75)),
       note: 'Qahva va kruassan',
     ),
@@ -117,6 +143,7 @@ class LocalStorageService {
       title: 'Avtobus',
       amount: 12000,
       categoryId: 'transport',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
       note: 'Shahar bo\'ylab safar',
     ),
@@ -125,6 +152,7 @@ class LocalStorageService {
       title: 'Do\'kon',
       amount: 85000,
       categoryId: 'home',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(days: 1, hours: 6)),
       note: 'Uy uchun tozalik vositalari',
     ),
@@ -133,6 +161,7 @@ class LocalStorageService {
       title: 'Kiyim',
       amount: 120000,
       categoryId: 'clothes',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(days: 2, hours: 4)),
       note: 'Yangi futbolka va paypoqlar',
     ),
@@ -141,6 +170,7 @@ class LocalStorageService {
       title: 'Shifokor',
       amount: 50000,
       categoryId: 'health',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(days: 4, hours: 8)),
       note: 'Profilaktik ko\'rik',
     ),
@@ -149,6 +179,7 @@ class LocalStorageService {
       title: 'Tushlik (Kafe)',
       amount: 492000,
       categoryId: 'food',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(days: 5)),
       note: 'Jamoaviy biznes tushlik',
     ),
@@ -157,6 +188,7 @@ class LocalStorageService {
       title: 'Taksi xizmati',
       amount: 218000,
       categoryId: 'transport',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(days: 7)),
       note: 'Aeroportga borish',
     ),
@@ -165,6 +197,7 @@ class LocalStorageService {
       title: 'Kommunal to\'lovlar',
       amount: 315000,
       categoryId: 'home',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(days: 10)),
       note: 'Elektr energiyasi va gaz',
     ),
@@ -173,6 +206,7 @@ class LocalStorageService {
       title: 'Kutubxona & Kitoblar',
       amount: 100000,
       categoryId: 'other',
+      type: TransactionType.expense,
       dateTime: DateTime.now().subtract(const Duration(days: 14)),
       note: 'Shaxsiy rivojlanish kitobi',
     ),
@@ -188,19 +222,19 @@ class LocalStorageService {
       date: DateTime.now().subtract(const Duration(days: 12)),
       dueDate: DateTime.now().add(const Duration(days: 10)),
       status: DebtStatus.active,
-      isBorrowed: true, // Red: Borrowed from Akmal
+      type: DebtType.borrowed, // Red: Borrowed from Akmal (I owe Akmal)
       note: 'Mashina ta\'miri uchun olingan',
     ),
     DebtItem(
       id: 'debt_2',
-      personName: 'Ali',
+      personName: 'Javohir',
       phoneNumber: '+998 93 987 65 43',
-      amount: 300000,
+      amount: 350000,
       paidAmount: 0,
       date: DateTime.now().subtract(const Duration(days: 6)),
       dueDate: DateTime.now().add(const Duration(days: 15)),
       status: DebtStatus.active,
-      isBorrowed: false, // Green: Lent to Ali
+      type: DebtType.lent, // Green: Lent to Javohir (Javohir owes me)
       note: 'Do\'stimga berilgan qarz',
     ),
     DebtItem(
@@ -212,8 +246,17 @@ class LocalStorageService {
       date: DateTime.now().subtract(const Duration(days: 20)),
       dueDate: DateTime.now().add(const Duration(days: 5)),
       status: DebtStatus.partiallyPaid,
-      isBorrowed: false, // Lent to Dilshod
+      type: DebtType.lent,
       note: '100 000 so\'m qaytardi, 150 000 so\'m qoldi',
+      repayments: [
+        DebtRepayment(
+          id: 'rep_1',
+          debtId: 'debt_3',
+          amount: 100000,
+          date: DateTime.now().subtract(const Duration(days: 3)),
+          note: 'Birinchi qism qaytarildi',
+        ),
+      ],
     ),
   ];
 

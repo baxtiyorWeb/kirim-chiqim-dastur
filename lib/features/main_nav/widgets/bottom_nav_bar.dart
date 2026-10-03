@@ -18,15 +18,17 @@ class CustomBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.card,
-        border: const Border(
-          top: BorderSide(color: AppColors.border, width: 1),
+        color: colors.card,
+        border: Border(
+          top: BorderSide(color: colors.border, width: 1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.04),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -41,6 +43,7 @@ class CustomBottomNavBar extends StatelessWidget {
             children: [
               // 1. Bosh sahifa
               _navItem(
+                context: context,
                 index: 0,
                 icon: Icons.home_rounded,
                 label: AppStrings.navHome,
@@ -48,27 +51,28 @@ class CustomBottomNavBar extends StatelessWidget {
 
               // 2. Xarajatlar
               _navItem(
+                context: context,
                 index: 1,
                 icon: Icons.receipt_long_rounded,
                 label: AppStrings.navExpenses,
               ),
 
-              // 3. Center Floating "+" Button
+              // 3. Central FAB "+" Button
               GestureDetector(
                 onTap: () {
                   HapticUtil.medium();
                   onAddPressed();
                 },
                 child: Container(
-                  width: 48,
-                  height: 48,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.35),
-                        blurRadius: 12,
+                        color: AppColors.primary.withValues(alpha: 0.38),
+                        blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
                     ],
@@ -76,13 +80,14 @@ class CustomBottomNavBar extends StatelessWidget {
                   child: const Icon(
                     Icons.add_rounded,
                     color: Colors.white,
-                    size: 26,
+                    size: 28,
                   ),
                 ),
               ),
 
               // 4. Statistika
               _navItem(
+                context: context,
                 index: 2,
                 icon: Icons.bar_chart_rounded,
                 label: AppStrings.navStats,
@@ -90,6 +95,7 @@ class CustomBottomNavBar extends StatelessWidget {
 
               // 5. Profil
               _navItem(
+                context: context,
                 index: 3,
                 icon: Icons.person_rounded,
                 label: AppStrings.navProfile,
@@ -102,12 +108,14 @@ class CustomBottomNavBar extends StatelessWidget {
   }
 
   Widget _navItem({
+    required BuildContext context,
     required int index,
     required IconData icon,
     required String label,
   }) {
+    final colors = context.appColors;
     final isSelected = currentIndex == index;
-    final color = isSelected ? AppColors.primary : AppColors.textSecondary;
+    final color = isSelected ? AppColors.primary : colors.textSecondary;
 
     return Expanded(
       child: InkWell(
@@ -121,7 +129,7 @@ class CustomBottomNavBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedScale(
-              scale: isSelected ? 1.12 : 1.0,
+              scale: isSelected ? 1.15 : 1.0,
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOutBack,
               child: Icon(icon, color: color, size: 24),

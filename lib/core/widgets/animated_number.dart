@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/currency_formatter.dart';
 
-class AnimatedCurrencyText extends StatelessWidget {
+class AnimatedCurrencyText extends StatefulWidget {
   final num amount;
   final TextStyle? style;
   final bool includeSymbol;
@@ -20,19 +20,50 @@ class AnimatedCurrencyText extends StatelessWidget {
   });
 
   @override
+  State<AnimatedCurrencyText> createState() => _AnimatedCurrencyTextState();
+}
+
+class _AnimatedCurrencyTextState extends State<AnimatedCurrencyText> {
+  late double _oldAmount;
+
+  @override
+  void initState() {
+    super.initState();
+    _oldAmount = widget.amount.toDouble();
+  }
+
+  @override
+  void didUpdateWidget(covariant AnimatedCurrencyText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.amount != widget.amount) {
+      _oldAmount = oldWidget.amount.toDouble();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final disableAnimations = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+    if (disableAnimations) {
+      return Text(
+        '${widget.prefix}${CurrencyFormatter.format(widget.amount, includeSymbol: widget.includeSymbol)}',
+        style: widget.style,
+      );
+    }
+
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: amount.toDouble()),
-      duration: duration,
-      curve: curve,
+      key: ValueKey(widget.amount),
+      tween: Tween<double>(begin: _oldAmount, end: widget.amount.toDouble()),
+      duration: widget.duration,
+      curve: widget.curve,
       builder: (context, value, child) {
         final formatted = CurrencyFormatter.format(
           value.round(),
-          includeSymbol: includeSymbol,
+          includeSymbol: widget.includeSymbol,
         );
         return Text(
-          '$prefix$formatted',
-          style: style,
+          '${widget.prefix}$formatted',
+          style: widget.style,
         );
       },
     );

@@ -7,8 +7,8 @@ import '../../../providers/finance_providers.dart';
 
 class FintechQuickBanners extends StatelessWidget {
   final DebtsSummary debtsSummary;
-  final double budgetSpent;
-  final double budgetTotal;
+  final int budgetSpent;
+  final int budgetTotal;
   final VoidCallback onDebtsTap;
   final VoidCallback onBudgetTap;
 
@@ -23,6 +23,7 @@ class FintechQuickBanners extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final progress = budgetTotal > 0 ? (budgetSpent / budgetTotal).clamp(0.0, 1.0) : 0.0;
     final progressPercent = (progress * 100).toInt();
 
@@ -39,12 +40,12 @@ class FintechQuickBanners extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(AppDimensions.space16),
               decoration: BoxDecoration(
-                color: AppColors.card,
+                color: colors.card,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: colors.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
+                    color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -56,30 +57,30 @@ class FintechQuickBanners extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.pie_chart_outline_rounded,
                             size: 18,
                             color: AppColors.primary,
                           ),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text(
                             'Oylik smeta (Budjet)',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
+                              color: colors.textPrimary,
                             ),
                           ),
                         ],
                       ),
                       Text(
                         '$progressPercent%',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                          color: progress > 0.85 ? colors.expense : AppColors.primary,
                         ),
                       ),
                     ],
@@ -90,9 +91,9 @@ class FintechQuickBanners extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 6,
-                      backgroundColor: AppColors.borderLight,
+                      backgroundColor: colors.border,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        progress > 0.9 ? AppColors.expense : AppColors.primary,
+                        progress > 0.9 ? colors.expense : AppColors.primary,
                       ),
                     ),
                   ),
@@ -102,18 +103,18 @@ class FintechQuickBanners extends StatelessWidget {
                     children: [
                       Text(
                         'Sarflangan: ${CurrencyFormatter.format(budgetSpent)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
+                          color: colors.textSecondary,
                         ),
                       ),
                       Text(
                         'Limit: ${CurrencyFormatter.format(budgetTotal)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
                     ],
@@ -134,12 +135,12 @@ class FintechQuickBanners extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(AppDimensions.space16),
               decoration: BoxDecoration(
-                color: AppColors.card,
+                color: colors.card,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: colors.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
+                    color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -167,12 +168,12 @@ class FintechQuickBanners extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Qarzlar daftari',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                            color: colors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -182,15 +183,15 @@ class FintechQuickBanners extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppColors.borrowedLight,
+                                color: colors.borrowedBg,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 'Olingan: ${CurrencyFormatter.formatCompact(debtsSummary.remainingBorrowed)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.borrowed,
+                                  color: colors.borrowed,
                                 ),
                               ),
                             ),
@@ -199,15 +200,15 @@ class FintechQuickBanners extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppColors.lentLight,
+                                color: colors.lentBg,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 'Berilgan: ${CurrencyFormatter.formatCompact(debtsSummary.remainingLent)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.lent,
+                                  color: colors.lent,
                                 ),
                               ),
                             ),
@@ -217,10 +218,10 @@ class FintechQuickBanners extends StatelessWidget {
                     ),
                   ),
 
-                  const Icon(
+                  Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 14,
-                    color: AppColors.textTertiary,
+                    color: colors.textTertiary,
                   ),
                 ],
               ),

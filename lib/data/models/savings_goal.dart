@@ -1,8 +1,8 @@
 class SavingsGoal {
   final String id;
   final String title;
-  final double targetAmount;
-  final double currentAmount;
+  final int targetAmount;
+  final int currentAmount;
   final DateTime? deadline;
   final String emoji;
 
@@ -18,15 +18,15 @@ class SavingsGoal {
   double get progressPercentage =>
       targetAmount > 0 ? (currentAmount / targetAmount).clamp(0.0, 1.0) : 0.0;
 
-  double get remainingAmount => (targetAmount - currentAmount).clamp(0.0, targetAmount);
+  int get remainingAmount => (targetAmount - currentAmount).clamp(0, targetAmount);
 
   bool get isCompleted => currentAmount >= targetAmount;
 
   SavingsGoal copyWith({
     String? id,
     String? title,
-    double? targetAmount,
-    double? currentAmount,
+    int? targetAmount,
+    int? currentAmount,
     DateTime? deadline,
     String? emoji,
   }) {
@@ -52,12 +52,14 @@ class SavingsGoal {
   }
 
   factory SavingsGoal.fromJson(Map<String, dynamic> json) {
+    final rawTarget = json['targetAmount'];
+    final rawCurrent = json['currentAmount'];
     return SavingsGoal(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      targetAmount: (json['targetAmount'] as num).toDouble(),
-      currentAmount: (json['currentAmount'] as num).toDouble(),
-      deadline: json['deadline'] != null ? DateTime.parse(json['deadline'] as String) : null,
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      targetAmount: rawTarget is num ? rawTarget.round() : 0,
+      currentAmount: rawCurrent is num ? rawCurrent.round() : 0,
+      deadline: json['deadline'] != null ? DateTime.tryParse(json['deadline'].toString()) : null,
       emoji: json['emoji'] as String? ?? '🎯',
     );
   }

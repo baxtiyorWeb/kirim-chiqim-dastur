@@ -4,7 +4,9 @@ import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/date_formatter.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
+import '../../../core/widgets/app_bottom_sheets.dart';
 import '../../../data/models/debt_item.dart';
 import '../../../providers/finance_providers.dart';
 
@@ -16,12 +18,13 @@ class DebtsScreen extends ConsumerStatefulWidget {
 }
 
 class _DebtsScreenState extends ConsumerState<DebtsScreen> {
-  int _selectedFilter = 0; // 0: Barchasi, 1: Olingan (Borrowed), 2: Berilgan (Lent)
+  int _selectedFilter = 0; // 0: Barchasi, 1: Olingan (Qarzim), 2: Berilgan (Haqqim)
 
   @override
   Widget build(BuildContext context) {
     final debts = ref.watch(debtsProvider);
     final summary = ref.watch(debtsSummaryProvider);
+    final colors = context.appColors;
 
     final filteredDebts = debts.where((d) {
       if (_selectedFilter == 1) return d.isBorrowed;
@@ -30,15 +33,19 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        title: const Text(
-          'Qarzlar daftari',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        title: Text(
+          'Qarz daftari',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: colors.textPrimary,
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddDebtDialog(context),
+        onPressed: () => _showAddDebtSheet(context),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
@@ -59,9 +66,16 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(AppDimensions.space16),
                     decoration: BoxDecoration(
-                      color: AppColors.card,
+                      color: colors.card,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: colors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,18 +85,18 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                             Container(
                               width: 8,
                               height: 8,
-                              decoration: const BoxDecoration(
-                                color: AppColors.borrowed,
+                              decoration: BoxDecoration(
+                                color: colors.borrowed,
                                 shape: BoxShape.circle,
                               ),
                             ),
                             const SizedBox(width: 6),
-                            const Text(
+                            Text(
                               'Olingan qarz',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
+                                color: colors.textSecondary,
                               ),
                             ),
                           ],
@@ -90,10 +104,10 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                         const SizedBox(height: 8),
                         Text(
                           CurrencyFormatter.format(summary.remainingBorrowed),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.borrowed,
+                            color: colors.borrowed,
                           ),
                         ),
                       ],
@@ -108,9 +122,16 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(AppDimensions.space16),
                     decoration: BoxDecoration(
-                      color: AppColors.card,
+                      color: colors.card,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: colors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,18 +141,18 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                             Container(
                               width: 8,
                               height: 8,
-                              decoration: const BoxDecoration(
-                                color: AppColors.lent,
+                              decoration: BoxDecoration(
+                                color: colors.lent,
                                 shape: BoxShape.circle,
                               ),
                             ),
                             const SizedBox(width: 6),
-                            const Text(
+                            Text(
                               'Berilgan qarz',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
+                                color: colors.textSecondary,
                               ),
                             ),
                           ],
@@ -139,10 +160,10 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                         const SizedBox(height: 8),
                         Text(
                           CurrencyFormatter.format(summary.remainingLent),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.lent,
+                            color: colors.lent,
                           ),
                         ),
                       ],
@@ -158,9 +179,9 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: AppColors.card,
+                color: colors.card,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: colors.border),
               ),
               child: Row(
                 children: [
@@ -175,12 +196,12 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
 
             // Debts List
             if (filteredDebts.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Center(
                   child: Text(
                     'Qarzlar ro\'yxati bo\'sh',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: colors.textSecondary),
                   ),
                 ),
               )
@@ -192,16 +213,23 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                 itemBuilder: (context, index) {
                   final debt = filteredDebts[index];
                   final isBorrowed = debt.isBorrowed;
-                  final indicatorColor = isBorrowed ? AppColors.borrowed : AppColors.lent;
-                  final indicatorBg = isBorrowed ? AppColors.borrowedLight : AppColors.lentLight;
+                  final indicatorColor = isBorrowed ? colors.borrowed : colors.lent;
+                  final indicatorBg = isBorrowed ? colors.borrowedBg : colors.lentBg;
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(AppDimensions.space16),
                     decoration: BoxDecoration(
-                      color: AppColors.card,
+                      color: colors.card,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: colors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,7 +237,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Initial Avatar with indicator color
+                            // Initial Avatar
                             Container(
                               width: 44,
                               height: 44,
@@ -231,7 +259,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
 
                             const SizedBox(width: AppDimensions.space12),
 
-                            // Person info & date
+                            // Person info & amounts
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,10 +269,10 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                     children: [
                                       Text(
                                         debt.personName,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w700,
-                                          color: AppColors.textPrimary,
+                                          color: colors.textPrimary,
                                         ),
                                       ),
                                       Text(
@@ -262,7 +290,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        isBorrowed ? 'Olingan qarz' : 'Berilgan qarz',
+                                        isBorrowed ? 'Men olgan qarz' : 'Men bergan qarz',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: indicatorColor,
@@ -272,9 +300,9 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                       if (debt.phoneNumber != null)
                                         Text(
                                           debt.phoneNumber!,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: AppColors.textSecondary,
+                                            color: colors.textSecondary,
                                           ),
                                         ),
                                     ],
@@ -289,15 +317,41 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                           const SizedBox(height: 8),
                           Text(
                             debt.note!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+
+                        // Repayment history pill/expansion if repayments exist
+                        if (debt.repayments.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () => _showRepaymentsHistorySheet(context, debt),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.history_rounded, size: 14, color: colors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${debt.repayments.length} ta to\'lov tarixi ko\'rish',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
 
                         const SizedBox(height: 12),
-                        const Divider(color: AppColors.borderLight, height: 1),
+                        Divider(color: colors.border, height: 1),
                         const SizedBox(height: 8),
 
                         // Bottom Actions: Status Pill & Action Buttons
@@ -309,8 +363,8 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: debt.status == DebtStatus.returned
-                                    ? AppColors.lentLight
-                                    : AppColors.surfaceVariant,
+                                    ? colors.lentBg
+                                    : colors.surfaceVariant,
                                 borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
                               ),
                               child: Text(
@@ -319,8 +373,8 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                   color: debt.status == DebtStatus.returned
-                                      ? AppColors.lent
-                                      : AppColors.textSecondary,
+                                      ? colors.lent
+                                      : colors.textSecondary,
                                 ),
                               ),
                             ),
@@ -330,14 +384,22 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                 children: [
                                   // Record partial payment
                                   TextButton(
-                                    onPressed: () => _recordPaymentDialog(context, debt),
+                                    onPressed: () => showDebtPaymentSheet(context, ref, debt),
                                     child: const Text('To\'lov kiritish', style: TextStyle(fontSize: 12)),
                                   ),
                                   // Mark fully returned
                                   ElevatedButton(
-                                    onPressed: () {
-                                      HapticUtil.success();
-                                      ref.read(debtsProvider.notifier).markAsReturned(debt.id);
+                                    onPressed: () async {
+                                      final confirm = await showConfirmSheet(
+                                        context: context,
+                                        title: 'Qarzni yopish',
+                                        message: '${debt.personName} bilan bo\'lgan qarz to\'liq qaytarildi deb belgilansinmi?',
+                                        confirmLabel: 'Ha, yopilsin',
+                                      );
+                                      if (confirm == true) {
+                                        HapticUtil.success();
+                                        ref.read(debtsProvider.notifier).markAsReturned(debt.id);
+                                      }
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.primary,
@@ -369,6 +431,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
   }
 
   Widget _filterTab(int index, String title) {
+    final colors = context.appColors;
     final isSelected = _selectedFilter == index;
     return Expanded(
       child: GestureDetector(
@@ -391,7 +454,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected ? Colors.white : AppColors.textSecondary,
+              color: isSelected ? Colors.white : colors.textSecondary,
             ),
           ),
         ),
@@ -399,68 +462,89 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
     );
   }
 
-  void _recordPaymentDialog(BuildContext context, DebtItem debt) {
-    final controller = TextEditingController();
-    showDialog(
+  void _showRepaymentsHistorySheet(BuildContext context, DebtItem debt) {
+    final colors = context.appColors;
+    showAppModalBottomSheet(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${debt.personName} — To\'lovlar tarixi',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              ...debt.repayments.map((rep) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            CurrencyFormatter.format(rep.amount),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          if (rep.note != null && rep.note!.isNotEmpty)
+                            Text(
+                              rep.note!,
+                              style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                            ),
+                        ],
+                      ),
+                      Text(
+                        DateFormatter.formatDateWithPrefix(rep.date),
+                        style: TextStyle(fontSize: 11, color: colors.textTertiary),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
           ),
-          title: Text('${debt.personName} dan to\'lov'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'To\'langan summa',
-              suffixText: 'so\'m',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Bekor qilish'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final amt = double.tryParse(controller.text.replaceAll(' ', '')) ?? 0.0;
-                if (amt > 0) {
-                  ref.read(debtsProvider.notifier).recordPayment(debt.id, amt);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Saqlash'),
-            ),
-          ],
         );
       },
     );
   }
 
-  void _showAddDebtDialog(BuildContext context) {
+  void _showAddDebtSheet(BuildContext context) {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final amountController = TextEditingController();
     final noteController = TextEditingController();
-    bool isBorrowed = false;
+    DebtType selectedType = DebtType.lent;
+    final colors = context.appColors;
 
-    showModalBottomSheet(
+    showAppModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
+      builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
               padding: EdgeInsets.only(
                 left: 20,
                 right: 20,
-                top: 20,
+                top: 8,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
               child: SingleChildScrollView(
@@ -468,9 +552,13 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Yangi qarz yozish',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    Text(
+                      'Yangi qarz kiritish',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -479,27 +567,27 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                       children: [
                         Expanded(
                           child: ChoiceChip(
-                            label: const Center(child: Text('Berilgan (Menga qaytaradi)')),
-                            selected: !isBorrowed,
-                            selectedColor: AppColors.lent,
+                            label: const Center(child: Text('Berilgan (Haqqim)')),
+                            selected: selectedType == DebtType.lent,
+                            selectedColor: colors.lent,
                             labelStyle: TextStyle(
-                              color: !isBorrowed ? Colors.white : AppColors.textPrimary,
+                              color: selectedType == DebtType.lent ? Colors.white : colors.textPrimary,
                               fontWeight: FontWeight.w600,
                             ),
-                            onSelected: (val) => setModalState(() => isBorrowed = false),
+                            onSelected: (_) => setModalState(() => selectedType = DebtType.lent),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: ChoiceChip(
-                            label: const Center(child: Text('Olingan (Men qaytaraman)')),
-                            selected: isBorrowed,
-                            selectedColor: AppColors.borrowed,
+                            label: const Center(child: Text('Olingan (Qarzim)')),
+                            selected: selectedType == DebtType.borrowed,
+                            selectedColor: colors.borrowed,
                             labelStyle: TextStyle(
-                              color: isBorrowed ? Colors.white : AppColors.textPrimary,
+                              color: selectedType == DebtType.borrowed ? Colors.white : colors.textPrimary,
                               fontWeight: FontWeight.w600,
                             ),
-                            onSelected: (val) => setModalState(() => isBorrowed = true),
+                            onSelected: (_) => setModalState(() => selectedType = DebtType.borrowed),
                           ),
                         ),
                       ],
@@ -531,11 +619,11 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
 
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
+                      height: AppDimensions.buttonHeight,
                       child: ElevatedButton(
                         onPressed: () {
                           final name = nameController.text.trim();
-                          final amt = double.tryParse(amountController.text.replaceAll(' ', '')) ?? 0;
+                          final amt = CurrencyFormatter.parse(amountController.text);
                           if (name.isNotEmpty && amt > 0) {
                             final newDebt = DebtItem(
                               id: const Uuid().v4(),
@@ -545,16 +633,24 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                   : null,
                               amount: amt,
                               date: DateTime.now(),
-                              isBorrowed: isBorrowed,
+                              type: selectedType,
                               note: noteController.text.trim().isNotEmpty
                                   ? noteController.text.trim()
                                   : null,
                             );
                             ref.read(debtsProvider.notifier).addDebt(newDebt);
-                            Navigator.pop(context);
+                            Navigator.pop(ctx);
+                            HapticUtil.success();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Qarz muvaffaqiyatli saqlandi'),
+                                backgroundColor: AppColors.primary,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
                           }
                         },
-                        child: const Text('Qo\'shish'),
+                        child: const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],

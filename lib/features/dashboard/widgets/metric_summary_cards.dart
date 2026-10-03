@@ -5,8 +5,8 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/widgets/animated_number.dart';
 
 class MetricSummaryCards extends StatelessWidget {
-  final double thisMonthExpense;
-  final double remainingBudget;
+  final int thisMonthExpense;
+  final int remainingBudget;
   final VoidCallback? onMonthTap;
   final VoidCallback? onRemainingTap;
 
@@ -54,7 +54,7 @@ class MetricSummaryCards extends StatelessWidget {
 
 class _MetricCard extends StatelessWidget {
   final String label;
-  final double amount;
+  final int amount;
   final IconData icon;
   final Color iconColor;
   final Color iconBg;
@@ -71,17 +71,19 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(AppDimensions.space16),
         decoration: BoxDecoration(
-          color: AppColors.card,
+          color: colors.card,
           borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: colors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
+              color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -96,8 +98,8 @@ class _MetricCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
+                  style: TextStyle(
+                    color: colors.textSecondary,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -122,8 +124,8 @@ class _MetricCard extends StatelessWidget {
             // Amount
             AnimatedCurrencyText(
               amount: amount,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
+              style: TextStyle(
+                color: colors.textPrimary,
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,

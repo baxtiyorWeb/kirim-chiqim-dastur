@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
+import '../../../core/widgets/app_bottom_sheets.dart';
 import '../../../providers/finance_providers.dart';
 import '../widgets/dashboard_hero_card.dart';
 import '../widgets/metric_summary_cards.dart';
@@ -23,9 +24,10 @@ class DashboardScreen extends ConsumerWidget {
     final balance = ref.watch(balanceProvider);
     final budget = ref.watch(budgetProvider);
     final debtsSummary = ref.watch(debtsSummaryProvider);
+    final colors = context.appColors;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
@@ -45,15 +47,15 @@ class DashboardScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         RichText(
-                          text: const TextSpan(
+                          text: TextSpan(
                             text: '${AppStrings.greeting} ',
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w400,
-                              color: AppColors.textPrimary,
+                              color: colors.textPrimary,
                               letterSpacing: -0.3,
                             ),
-                            children: [
+                            children: const [
                               TextSpan(
                                 text: AppStrings.userName,
                                 style: TextStyle(
@@ -64,12 +66,12 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           AppStrings.dashboardSubtitle,
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w400,
-                            color: AppColors.textSecondary,
+                            color: colors.textSecondary,
                           ),
                         ),
                       ],
@@ -86,7 +88,7 @@ class DashboardScreen extends ConsumerWidget {
                         height: 44,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: colors.border, width: 2),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.08),
@@ -167,7 +169,10 @@ class DashboardScreen extends ConsumerWidget {
               RecentExpensesList(
                 transactions: transactions,
                 onViewAll: () => context.push('/transactions'),
-                onItemTap: (item) {},
+                onItemTap: (item) {
+                  // Instant edit bottom sheet!
+                  showAddEditTransactionSheet(context, ref, existingItem: item);
+                },
               ),
 
               const SizedBox(height: 100), // padding for bottom navigation

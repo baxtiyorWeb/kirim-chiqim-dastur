@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/constants/app_colors.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'data/services/local_storage_service.dart';
@@ -16,7 +15,7 @@ void main() async {
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
-      systemNavigationBarColor: AppColors.card,
+      systemNavigationBarColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
@@ -36,7 +35,7 @@ void main() async {
   );
 }
 
-class FinanceTrackerApp extends StatefulWidget {
+class FinanceTrackerApp extends ConsumerStatefulWidget {
   final bool hasSeenOnboarding;
 
   const FinanceTrackerApp({
@@ -45,20 +44,24 @@ class FinanceTrackerApp extends StatefulWidget {
   });
 
   @override
-  State<FinanceTrackerApp> createState() => _FinanceTrackerAppState();
+  ConsumerState<FinanceTrackerApp> createState() => _FinanceTrackerAppState();
 }
 
-class _FinanceTrackerAppState extends State<FinanceTrackerApp> {
+class _FinanceTrackerAppState extends ConsumerState<FinanceTrackerApp> {
   late final _router = AppRouter.createRouter(
     hasSeenOnboarding: widget.hasSeenOnboarding,
   );
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp.router(
       title: 'Moliya - Shaxsiy Xarajatlar',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: _router,
     );
   }

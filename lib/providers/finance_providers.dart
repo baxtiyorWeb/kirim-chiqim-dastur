@@ -1,5 +1,5 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import '../data/models/transaction_item.dart';
 import '../data/models/debt_item.dart';
 import '../data/models/budget_model.dart';
@@ -17,162 +17,282 @@ final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
   return FinanceRepository(storage);
 });
 
-// Transactions Notifier
-class TransactionsNotifier extends StateNotifier<List<TransactionItem>> {
-  final FinanceRepository _repo;
+// Theme Mode Notifier
+class ThemeModeNotifier extends Notifier<ThemeMode> {
+  @override
+  ThemeMode build() {
+    final repo = ref.watch(financeRepositoryProvider);
+    return repo.getThemeMode();
+  }
 
-  TransactionsNotifier(this._repo) : super(_repo.getTransactions());
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = mode;
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.setThemeMode(mode);
+  }
+}
+
+final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(() {
+  return ThemeModeNotifier();
+});
+
+// Transactions Notifier
+class TransactionsNotifier extends Notifier<List<TransactionItem>> {
+  @override
+  List<TransactionItem> build() {
+    final repo = ref.watch(financeRepositoryProvider);
+    return repo.getTransactions();
+  }
 
   Future<void> addTransaction(TransactionItem item) async {
-    await _repo.addTransaction(item);
-    state = _repo.getTransactions();
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.addTransaction(item);
+    state = repo.getTransactions();
+  }
+
+  Future<void> updateTransaction(TransactionItem item) async {
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.updateTransaction(item);
+    state = repo.getTransactions();
   }
 
   Future<void> deleteTransaction(String id) async {
-    await _repo.deleteTransaction(id);
-    state = _repo.getTransactions();
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.deleteTransaction(id);
+    state = repo.getTransactions();
   }
 }
 
-final transactionsProvider = StateNotifierProvider<TransactionsNotifier, List<TransactionItem>>((ref) {
-  final repo = ref.watch(financeRepositoryProvider);
-  return TransactionsNotifier(repo);
+final transactionsProvider = NotifierProvider<TransactionsNotifier, List<TransactionItem>>(() {
+  return TransactionsNotifier();
 });
 
-// Balance Notifier
-class BalanceNotifier extends StateNotifier<double> {
-  final FinanceRepository _repo;
-
-  BalanceNotifier(this._repo) : super(_repo.getBalance());
-
-  Future<void> setBalance(double newBalance) async {
-    await _repo.setBalance(newBalance);
-    state = newBalance;
+// Initial Balance Notifier (Opening balance)
+class InitialBalanceNotifier extends Notifier<int> {
+  @override
+  int build() {
+    final repo = ref.watch(financeRepositoryProvider);
+    return repo.getInitialBalance();
   }
 
-  void refresh() {
-    state = _repo.getBalance();
+  Future<void> setInitialBalance(int newBalance) async {
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.setInitialBalance(newBalance);
+    state = newBalance;
   }
 }
 
-final balanceProvider = StateNotifierProvider<BalanceNotifier, double>((ref) {
-  final repo = ref.watch(financeRepositoryProvider);
-  return BalanceNotifier(repo);
+final initialBalanceProvider = NotifierProvider<InitialBalanceNotifier, int>(() {
+  return InitialBalanceNotifier();
+});
+
+// Single Source of Truth Ledger Balance
+// Balance = Initial Balance + All Income - All Expense
+final balanceProvider = Provider<int>((ref) {
+  final initial = ref.watch(initialBalanceProvider);
+  final transactions = ref.watch(transactionsProvider);
+
+  int net = initial;
+  for (final t in transactions) {
+    if (t.isExpense) {
+      net -= t.amount;
+    } else if (t.isIncome) {
+      net += t.amount;
+    }
+  }
+  return net;
 });
 
 // Debts Notifier
-class DebtsNotifier extends StateNotifier<List<DebtItem>> {
-  final FinanceRepository _repo;
-
-  DebtsNotifier(this._repo) : super(_repo.getDebts());
+class DebtsNotifier extends Notifier<List<DebtItem>> {
+  @override
+  List<DebtItem> build() {
+    final repo = ref.watch(financeRepositoryProvider);
+    return repo.getDebts();
+  }
 
   Future<void> addDebt(DebtItem debt) async {
-    await _repo.addDebt(debt);
-    state = _repo.getDebts();
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.addDebt(debt);
+    state = repo.getDebts();
   }
 
   Future<void> updateDebt(DebtItem debt) async {
-    await _repo.updateDebt(debt);
-    state = _repo.getDebts();
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.updateDebt(debt);
+    state = repo.getDebts();
+  }
+
+  Future<void> recordPayment({
+    required String debtId,
+    required int amount,
+    String? note,
+    bool linkTransaction = false,
+  }) async {
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.recordDebtPayment(
+      debtId: debtId,
+      paymentAmount: amount,
+      note: note,
+      linkTransaction: linkTransaction,
+    );
+    state = repo.getDebts();
+    if (linkTransaction) {
+      ref.invalidate(transactionsProvider);
+    }
   }
 
   Future<void> markAsReturned(String id) async {
-    final item = state.firstWhere((d) => d.id == id);
-    final updated = item.copyWith(
-      status: DebtStatus.returned,
-      paidAmount: item.amount,
-    );
-    await updateDebt(updated);
-  }
-
-  Future<void> recordPayment(String id, double additionalPaid) async {
-    final item = state.firstWhere((d) => d.id == id);
-    final newPaid = (item.paidAmount + additionalPaid).clamp(0.0, item.amount);
-    final newStatus = newPaid >= item.amount ? DebtStatus.returned : DebtStatus.partiallyPaid;
-    final updated = item.copyWith(
-      paidAmount: newPaid,
-      status: newStatus,
-    );
-    await updateDebt(updated);
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.markDebtReturned(id);
+    state = repo.getDebts();
   }
 
   Future<void> deleteDebt(String id) async {
-    await _repo.deleteDebt(id);
-    state = _repo.getDebts();
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.deleteDebt(id);
+    state = repo.getDebts();
   }
 }
 
-final debtsProvider = StateNotifierProvider<DebtsNotifier, List<DebtItem>>((ref) {
-  final repo = ref.watch(financeRepositoryProvider);
-  return DebtsNotifier(repo);
+final debtsProvider = NotifierProvider<DebtsNotifier, List<DebtItem>>(() {
+  return DebtsNotifier();
 });
 
 // Budget Notifier
-class BudgetNotifier extends StateNotifier<BudgetModel> {
-  final FinanceRepository _repo;
+class BudgetNotifier extends Notifier<BudgetModel> {
+  @override
+  BudgetModel build() {
+    final repo = ref.watch(financeRepositoryProvider);
+    return repo.getBudget();
+  }
 
-  BudgetNotifier(this._repo) : super(_repo.getBudget());
-
-  Future<void> updateMonthlyBudget(double amount) async {
+  Future<void> updateMonthlyBudget(int amount) async {
     final updated = state.copyWith(totalMonthlyBudget: amount);
-    await _repo.saveBudget(updated);
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.saveBudget(updated);
     state = updated;
   }
 
-  Future<void> updateCategoryLimit(String categoryId, double limit) async {
-    final newLimits = Map<String, double>.from(state.categoryLimits);
+  Future<void> updateCategoryLimit(String categoryId, int limit) async {
+    final newLimits = Map<String, int>.from(state.categoryLimits);
     newLimits[categoryId] = limit;
     final updated = state.copyWith(categoryLimits: newLimits);
-    await _repo.saveBudget(updated);
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.saveBudget(updated);
+    state = updated;
+  }
+
+  Future<void> toggleBudget(bool enabled) async {
+    final updated = state.copyWith(isEnabled: enabled);
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.saveBudget(updated);
     state = updated;
   }
 }
 
-final budgetProvider = StateNotifierProvider<BudgetNotifier, BudgetModel>((ref) {
-  final repo = ref.watch(financeRepositoryProvider);
-  return BudgetNotifier(repo);
+final budgetProvider = NotifierProvider<BudgetNotifier, BudgetModel>(() {
+  return BudgetNotifier();
 });
 
 // Goals Notifier
-class GoalsNotifier extends StateNotifier<List<SavingsGoal>> {
-  final FinanceRepository _repo;
-
-  GoalsNotifier(this._repo) : super(_repo.getGoals());
-
-  Future<void> addGoal(SavingsGoal goal) async {
-    await _repo.addGoal(goal);
-    state = _repo.getGoals();
+class GoalsNotifier extends Notifier<List<SavingsGoal>> {
+  @override
+  List<SavingsGoal> build() {
+    final repo = ref.watch(financeRepositoryProvider);
+    return repo.getGoals();
   }
 
-  Future<void> addDeposit(String goalId, double amount) async {
+  Future<void> addGoal(SavingsGoal goal) async {
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.addGoal(goal);
+    state = repo.getGoals();
+  }
+
+  Future<void> addDeposit(String goalId, int amount) async {
     final item = state.firstWhere((g) => g.id == goalId);
     final updated = item.copyWith(currentAmount: item.currentAmount + amount);
-    await _repo.updateGoal(updated);
-    state = _repo.getGoals();
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.updateGoal(updated);
+    state = repo.getGoals();
+  }
+
+  Future<void> deleteGoal(String id) async {
+    final repo = ref.read(financeRepositoryProvider);
+    await repo.deleteGoal(id);
+    state = repo.getGoals();
   }
 }
 
-final goalsProvider = StateNotifierProvider<GoalsNotifier, List<SavingsGoal>>((ref) {
-  final repo = ref.watch(financeRepositoryProvider);
-  return GoalsNotifier(repo);
+final goalsProvider = NotifierProvider<GoalsNotifier, List<SavingsGoal>>(() {
+  return GoalsNotifier();
 });
 
-// Selected Date Filter for Transactions screen
-final selectedDateFilterProvider = StateProvider<DateTime>((ref) => DateTime(2025, 9, 24));
+// Selected Date Filter for Transactions screen (dynamic current month/year)
+class SelectedDateNotifier extends Notifier<DateTime> {
+  @override
+  DateTime build() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, 1);
+  }
+
+  void setDate(DateTime date) {
+    state = date;
+  }
+
+  void nextMonth() {
+    state = DateTime(state.year, state.month + 1, 1);
+  }
+
+  void prevMonth() {
+    state = DateTime(state.year, state.month - 1, 1);
+  }
+}
+
+final selectedDateFilterProvider =
+    NotifierProvider<SelectedDateNotifier, DateTime>(() {
+  return SelectedDateNotifier();
+});
 
 // Derived Providers
-final totalExpensesProvider = Provider<double>((ref) {
+final totalExpensesProvider = Provider<int>((ref) {
   final transactions = ref.watch(transactionsProvider);
-  final expenses = transactions.where((t) => t.isExpense);
-  return expenses.fold<double>(0.0, (sum, t) => sum + t.amount);
+  return transactions.where((t) => t.isExpense).fold<int>(0, (sum, t) => sum + t.amount);
 });
 
-final categoryExpensesProvider = Provider<Map<String, double>>((ref) {
+final totalIncomeProvider = Provider<int>((ref) {
   final transactions = ref.watch(transactionsProvider);
-  final map = <String, double>{};
+  return transactions.where((t) => t.isIncome).fold<int>(0, (sum, t) => sum + t.amount);
+});
+
+final currentMonthExpensesProvider = Provider<int>((ref) {
+  final transactions = ref.watch(transactionsProvider);
+  final filterDate = ref.watch(selectedDateFilterProvider);
+  return transactions
+      .where((t) =>
+          t.isExpense &&
+          t.dateTime.month == filterDate.month &&
+          t.dateTime.year == filterDate.year)
+      .fold<int>(0, (sum, t) => sum + t.amount);
+});
+
+final currentMonthIncomeProvider = Provider<int>((ref) {
+  final transactions = ref.watch(transactionsProvider);
+  final filterDate = ref.watch(selectedDateFilterProvider);
+  return transactions
+      .where((t) =>
+          t.isIncome &&
+          t.dateTime.month == filterDate.month &&
+          t.dateTime.year == filterDate.year)
+      .fold<int>(0, (sum, t) => sum + t.amount);
+});
+
+final categoryExpensesProvider = Provider<Map<String, int>>((ref) {
+  final transactions = ref.watch(transactionsProvider);
+  final map = <String, int>{};
   for (final t in transactions) {
     if (t.isExpense) {
-      map[t.categoryId] = (map[t.categoryId] ?? 0.0) + t.amount;
+      map[t.categoryId] = (map[t.categoryId] ?? 0) + t.amount;
     }
   }
   return map;
@@ -180,10 +300,10 @@ final categoryExpensesProvider = Provider<Map<String, double>>((ref) {
 
 // Debts Summary
 class DebtsSummary {
-  final double totalBorrowed;
-  final double remainingBorrowed;
-  final double totalLent;
-  final double remainingLent;
+  final int totalBorrowed;
+  final int remainingBorrowed;
+  final int totalLent;
+  final int remainingLent;
 
   const DebtsSummary({
     required this.totalBorrowed,
@@ -195,10 +315,10 @@ class DebtsSummary {
 
 final debtsSummaryProvider = Provider<DebtsSummary>((ref) {
   final debts = ref.watch(debtsProvider);
-  double borrowedTotal = 0;
-  double borrowedRemain = 0;
-  double lentTotal = 0;
-  double lentRemain = 0;
+  int borrowedTotal = 0;
+  int borrowedRemain = 0;
+  int lentTotal = 0;
+  int lentRemain = 0;
 
   for (final d in debts) {
     if (d.isBorrowed) {

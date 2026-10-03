@@ -6,7 +6,7 @@ import '../../../core/utils/currency_formatter.dart';
 
 class CategoryDonutData {
   final String categoryName;
-  final double amount;
+  final num amount;
   final double percentage;
   final Color color;
 
@@ -58,6 +58,7 @@ class _AnimatedDonutChartWidgetState extends State<AnimatedDonutChartWidget>
   @override
   Widget build(BuildContext context) {
     if (widget.data.isEmpty) return const SizedBox.shrink();
+    final colors = context.appColors;
 
     return Row(
       children: [
@@ -104,10 +105,10 @@ class _AnimatedDonutChartWidgetState extends State<AnimatedDonutChartWidget>
                     Expanded(
                       child: Text(
                         item.categoryName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
+                          color: colors.textPrimary,
                         ),
                       ),
                     ),
@@ -115,10 +116,10 @@ class _AnimatedDonutChartWidgetState extends State<AnimatedDonutChartWidget>
                     // Percentage
                     Text(
                       '${item.percentage.round()}%',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        color: colors.textSecondary,
                       ),
                     ),
 
@@ -126,11 +127,11 @@ class _AnimatedDonutChartWidgetState extends State<AnimatedDonutChartWidget>
 
                     // Amount
                     Text(
-                      CurrencyFormatter.format(item.amount, includeSymbol: false),
-                      style: const TextStyle(
+                      CurrencyFormatter.formatCompact(item.amount),
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: colors.textPrimary,
                       ),
                     ),
                   ],
@@ -169,7 +170,7 @@ class _DonutChartPainter extends CustomPainter {
     for (final item in data) {
       final sweepAngle = (item.percentage / 100.0) * 2 * pi * progress;
 
-      // Leave a tiny gap between segments
+      // Small gap between segments
       const gapAngle = 0.08;
       final adjustedSweep = max(0.0, sweepAngle - gapAngle);
 

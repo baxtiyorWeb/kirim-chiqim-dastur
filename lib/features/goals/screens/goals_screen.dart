@@ -4,6 +4,8 @@ import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/haptic_feedback_util.dart';
+import '../../../core/widgets/app_bottom_sheets.dart';
 import '../../../data/models/savings_goal.dart';
 import '../../../providers/finance_providers.dart';
 
@@ -13,13 +15,18 @@ class GoalsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goals = ref.watch(goalsProvider);
+    final colors = context.appColors;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Maqsadlar va Jamg\'arma',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: colors.textPrimary,
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -37,12 +44,12 @@ class GoalsScreen extends ConsumerWidget {
             const SizedBox(height: AppDimensions.space12),
 
             if (goals.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Center(
                   child: Text(
                     'Hozircha maqsadlar belgilanmagan',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: colors.textSecondary),
                   ),
                 ),
               )
@@ -51,7 +58,7 @@ class GoalsScreen extends ConsumerWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: goals.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final goal = goals[index];
                   final percent = (goal.progressPercentage * 100).toInt();
@@ -59,9 +66,16 @@ class GoalsScreen extends ConsumerWidget {
                   return Container(
                     padding: const EdgeInsets.all(AppDimensions.space16),
                     decoration: BoxDecoration(
-                      color: AppColors.card,
+                      color: colors.card,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: colors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,7 +85,7 @@ class GoalsScreen extends ConsumerWidget {
                             Container(
                               width: 44,
                               height: 44,
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 color: AppColors.primaryLight,
                                 shape: BoxShape.circle,
                               ),
@@ -89,18 +103,18 @@ class GoalsScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     goal.title,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
+                                      color: colors.textPrimary,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     '${CurrencyFormatter.format(goal.currentAmount)} / ${CurrencyFormatter.format(goal.targetAmount)}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                      color: colors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -130,7 +144,7 @@ class GoalsScreen extends ConsumerWidget {
                               return LinearProgressIndicator(
                                 value: val,
                                 minHeight: 8,
-                                backgroundColor: AppColors.borderLight,
+                                backgroundColor: colors.border,
                                 valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                               );
                             },
@@ -150,7 +164,7 @@ class GoalsScreen extends ConsumerWidget {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: goal.isCompleted ? AppColors.income : AppColors.textSecondary,
+                                color: goal.isCompleted ? colors.income : colors.textSecondary,
                               ),
                             ),
                             if (!goal.isCompleted)
@@ -176,39 +190,65 @@ class GoalsScreen extends ConsumerWidget {
 
   void _addDepositDialog(BuildContext context, WidgetRef ref, SavingsGoal goal) {
     final controller = TextEditingController();
-    showDialog(
+    final colors = context.appColors;
+
+    showAppModalBottomSheet(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 8,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
           ),
-          title: Text('${goal.title} ga qo\'shish'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Summa',
-              suffixText: 'so\'m',
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${goal.title} ga mablag\' qo\'shish',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Qo\'shiladigan summa',
+                  suffixText: 'so\'m',
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: AppDimensions.buttonHeight,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final amt = CurrencyFormatter.parse(controller.text);
+                    if (amt > 0) {
+                      HapticUtil.success();
+                      ref.read(goalsProvider.notifier).addDeposit(goal.id, amt);
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Jamg\'armaga muvaffaqiyatli qo\'shildi'),
+                          backgroundColor: AppColors.primary,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Qo\'shish', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Bekor qilish'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final amt = double.tryParse(controller.text.replaceAll(' ', '')) ?? 0.0;
-                if (amt > 0) {
-                  ref.read(goalsProvider.notifier).addDeposit(goal.id, amt);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Qo\'shish'),
-            ),
-          ],
         );
       },
     );
@@ -217,29 +257,29 @@ class GoalsScreen extends ConsumerWidget {
   void _showAddGoalDialog(BuildContext context, WidgetRef ref) {
     final titleController = TextEditingController();
     final amountController = TextEditingController();
+    final colors = context.appColors;
 
-    showModalBottomSheet(
+    showAppModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
+      builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
-            top: 20,
+            top: 8,
             bottom: MediaQuery.of(context).viewInsets.bottom + 20,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Yangi jamg\'arma maqsadi',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
+                ),
               ),
               const SizedBox(height: 14),
               TextField(
@@ -255,12 +295,13 @@ class GoalsScreen extends ConsumerWidget {
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: AppDimensions.buttonHeight,
                 child: ElevatedButton(
                   onPressed: () {
                     final title = titleController.text.trim();
-                    final amt = double.tryParse(amountController.text.replaceAll(' ', '')) ?? 0;
+                    final amt = CurrencyFormatter.parse(amountController.text);
                     if (title.isNotEmpty && amt > 0) {
+                      HapticUtil.success();
                       final newGoal = SavingsGoal(
                         id: const Uuid().v4(),
                         title: title,
@@ -269,10 +310,17 @@ class GoalsScreen extends ConsumerWidget {
                         emoji: '🚀',
                       );
                       ref.read(goalsProvider.notifier).addGoal(newGoal);
-                      Navigator.pop(context);
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Yangi maqsad yaratildi'),
+                          backgroundColor: AppColors.primary,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
                     }
                   },
-                  child: const Text('Yaratish'),
+                  child: const Text('Yaratish', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ),
             ],

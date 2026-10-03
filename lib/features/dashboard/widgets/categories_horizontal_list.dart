@@ -7,7 +7,7 @@ import '../../../core/utils/haptic_feedback_util.dart';
 import '../../../data/models/category_item.dart';
 
 class CategoriesHorizontalList extends StatelessWidget {
-  final Map<String, double> categoryExpenses;
+  final Map<String, int> categoryExpenses;
   final VoidCallback? onViewAll;
   final Function(CategoryItem)? onCategoryTap;
 
@@ -21,6 +21,7 @@ class CategoriesHorizontalList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final categories = CategoryItem.defaultExpenseCategories;
+    final colors = context.appColors;
 
     return Column(
       children: [
@@ -30,12 +31,12 @@ class CategoriesHorizontalList extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 AppStrings.categories,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: colors.textPrimary,
                 ),
               ),
               GestureDetector(
@@ -43,21 +44,21 @@ class CategoriesHorizontalList extends StatelessWidget {
                   HapticUtil.selection();
                   onViewAll?.call();
                 },
-                child: const Row(
+                child: Row(
                   children: [
                     Text(
                       AppStrings.viewAll,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
+                        color: colors.textSecondary,
                       ),
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Icon(
                       Icons.arrow_forward_rounded,
                       size: 14,
-                      color: AppColors.textSecondary,
+                      color: colors.textSecondary,
                     ),
                   ],
                 ),
@@ -79,7 +80,7 @@ class CategoriesHorizontalList extends StatelessWidget {
             separatorBuilder: (_, _) => const SizedBox(width: AppDimensions.space12),
             itemBuilder: (context, index) {
               final cat = categories[index];
-              final expense = categoryExpenses[cat.id] ?? 0.0;
+              final expense = categoryExpenses[cat.id] ?? 0;
 
               return _CategoryCard(
                 category: cat,
@@ -99,7 +100,7 @@ class CategoriesHorizontalList extends StatelessWidget {
 
 class _CategoryCard extends StatelessWidget {
   final CategoryItem category;
-  final double amount;
+  final int amount;
   final VoidCallback onTap;
 
   const _CategoryCard({
@@ -110,18 +111,20 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 104,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: AppColors.card,
+          color: colors.card,
           borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: colors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
+              color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -152,24 +155,24 @@ class _CategoryCard extends StatelessWidget {
               category.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
 
             const SizedBox(height: 2),
 
-            // Amount (e.g. "520 000")
+            // Amount
             Text(
-              CurrencyFormatter.format(amount, includeSymbol: false),
+              amount > 0 ? CurrencyFormatter.format(amount, includeSymbol: false) : '0 so\'m',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
+                color: colors.textSecondary,
               ),
             ),
           ],

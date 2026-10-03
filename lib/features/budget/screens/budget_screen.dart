@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/haptic_feedback_util.dart';
+import '../../../core/widgets/app_bottom_sheets.dart';
+import '../../../data/models/category_item.dart';
 import '../../../providers/finance_providers.dart';
 
 class BudgetScreen extends ConsumerWidget {
@@ -12,61 +15,33 @@ class BudgetScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final budget = ref.watch(budgetProvider);
     final categoryExpenses = ref.watch(categoryExpensesProvider);
+    final currentMonthExpenses = ref.watch(currentMonthExpensesProvider);
+    final colors = context.appColors;
 
-    // Dynamic calculations from user state or design defaults
-    final totalSpent = categoryExpenses.values.fold<double>(0.0, (a, b) => a + b);
-    final displaySpent = totalSpent > 0 ? totalSpent : 1850000.0;
+    final totalSpent = currentMonthExpenses;
     final totalBudget = budget.totalMonthlyBudget;
-    final remaining = (totalBudget - displaySpent).clamp(0.0, totalBudget);
-    final overallProgress = totalBudget > 0 ? (displaySpent / totalBudget).clamp(0.0, 1.0) : 0.0;
+    final remaining = (totalBudget - totalSpent).clamp(0, totalBudget);
+    final overallProgress = totalBudget > 0 ? (totalSpent / totalBudget).clamp(0.0, 1.0) : 0.0;
     final overallPercent = (overallProgress * 100).toInt();
 
-    // Specified categories from prompt: Food: 500k/700k, Transport: 150k/300k, Home: 600k/700k, Education: 200k/300k
-    final categoryBudgets = [
-      _CategoryBudgetData(
-        categoryId: 'food',
-        name: 'Ovqatlanish (Food)',
-        spent: categoryExpenses['food'] ?? 500000.0,
-        limit: budget.categoryLimits['food'] ?? 700000.0,
-        color: AppColors.food,
-        icon: Icons.restaurant_rounded,
-      ),
-      _CategoryBudgetData(
-        categoryId: 'transport',
-        name: 'Transport',
-        spent: categoryExpenses['transport'] ?? 150000.0,
-        limit: budget.categoryLimits['transport'] ?? 300000.0,
-        color: AppColors.transport,
-        icon: Icons.directions_car_rounded,
-      ),
-      _CategoryBudgetData(
-        categoryId: 'home',
-        name: 'Uy-joy (Home)',
-        spent: categoryExpenses['home'] ?? 600000.0,
-        limit: budget.categoryLimits['home'] ?? 700000.0,
-        color: AppColors.home,
-        icon: Icons.home_rounded,
-      ),
-      _CategoryBudgetData(
-        categoryId: 'education',
-        name: 'Ta\'lim (Education)',
-        spent: categoryExpenses['education'] ?? 200000.0,
-        limit: budget.categoryLimits['education'] ?? 300000.0,
-        color: AppColors.education,
-        icon: Icons.school_rounded,
-      ),
-    ];
+    // Standard categories list
+    final categories = CategoryItem.defaultExpenseCategories;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Oylik smeta (Budjet)',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: colors.textPrimary,
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_note_rounded),
+            icon: Icon(Icons.edit_note_rounded, color: colors.textPrimary),
+            tooltip: 'Smetani tahrirlash',
             onPressed: () => _editMonthlyBudgetDialog(context, ref, totalBudget),
           ),
         ],
@@ -79,17 +54,16 @@ class BudgetScreen extends ConsumerWidget {
           children: [
             const SizedBox(height: AppDimensions.space12),
 
-            // Hero Budget Card matching prompt specs:
-            // "Progress: 1,850,000 / 3,000,000 | Remaining: 1,150,000"
+            // Hero Budget Card
             Container(
               padding: const EdgeInsets.all(AppDimensions.space20),
               decoration: BoxDecoration(
-                color: AppColors.card,
+                color: colors.card,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: colors.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
+                    color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -101,20 +75,18 @@ class BudgetScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Umumiy oylik smeta',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                          color: colors.textSecondary,
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: overallProgress > 0.85
-                              ? AppColors.expenseLight
-                              : AppColors.primaryLight,
+                          color: overallProgress > 0.85 ? colors.expenseBg : AppColors.primaryLight,
                           borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
                         ),
                         child: Text(
@@ -122,9 +94,7 @@ class BudgetScreen extends ConsumerWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: overallProgress > 0.85
-                                ? AppColors.expense
-                                : AppColors.primary,
+                            color: overallProgress > 0.85 ? colors.expense : AppColors.primary,
                           ),
                         ),
                       ),
@@ -139,20 +109,20 @@ class BudgetScreen extends ConsumerWidget {
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        CurrencyFormatter.format(displaySpent, includeSymbol: false),
-                        style: const TextStyle(
+                        CurrencyFormatter.format(totalSpent, includeSymbol: false),
+                        style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                          color: colors.textPrimary,
                           letterSpacing: -0.5,
                         ),
                       ),
                       Text(
                         ' / ${CurrencyFormatter.format(totalBudget)}',
-                        style: const TextStyle(
-                          fontSize: 16,
+                        style: TextStyle(
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
+                          color: colors.textSecondary,
                         ),
                       ),
                     ],
@@ -171,9 +141,9 @@ class BudgetScreen extends ConsumerWidget {
                         return LinearProgressIndicator(
                           value: value,
                           minHeight: 10,
-                          backgroundColor: AppColors.borderLight,
+                          backgroundColor: colors.border,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            value > 0.9 ? AppColors.expense : AppColors.primary,
+                            value > 0.9 ? colors.expense : AppColors.primary,
                           ),
                         );
                       },
@@ -186,18 +156,18 @@ class BudgetScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'Qolgan mablag\':',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
+                          color: colors.textSecondary,
                         ),
                       ),
                       Text(
                         CurrencyFormatter.format(remaining),
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,
                         ),
@@ -214,19 +184,19 @@ class BudgetScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Kategoriyalar bo\'yicha limitlar',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: colors.textPrimary,
                   ),
                 ),
                 Text(
-                  '${categoryBudgets.length} kategoriya',
-                  style: const TextStyle(
+                  '${categories.length} kategoriya',
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: colors.textSecondary,
                   ),
                 ),
               ],
@@ -238,87 +208,109 @@ class BudgetScreen extends ConsumerWidget {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: categoryBudgets.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemCount: categories.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final item = categoryBudgets[index];
-                final progress = item.limit > 0 ? (item.spent / item.limit).clamp(0.0, 1.0) : 0.0;
+                final cat = categories[index];
+                final spent = categoryExpenses[cat.id] ?? 0;
+                final limit = budget.categoryLimits[cat.id] ?? 300000;
+                final progress = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
                 final percent = (progress * 100).toInt();
 
-                return Container(
-                  padding: const EdgeInsets.all(AppDimensions.space16),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: item.color.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
+                return InkWell(
+                  onTap: () {
+                    HapticUtil.selection();
+                    _editCategoryLimitDialog(context, ref, cat, limit);
+                  },
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                  child: Container(
+                    padding: const EdgeInsets.all(AppDimensions.space16),
+                    decoration: BoxDecoration(
+                      color: colors.card,
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                      border: Border.all(color: colors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: cat.backgroundColor,
+                                borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
+                              ),
+                              child: Icon(cat.icon, color: cat.iconColor, size: 20),
                             ),
-                            child: Icon(item.icon, color: item.color, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    cat.name,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${CurrencyFormatter.formatCompact(spent)} / ${CurrencyFormatter.formatCompact(limit)} so\'m',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
                               children: [
                                 Text(
-                                  item.name,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
+                                  '$percent%',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: progress > 0.85 ? colors.expense : colors.textPrimary,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${CurrencyFormatter.formatCompact(item.spent)} / ${CurrencyFormatter.formatCompact(item.limit)} so\'m',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.edit_outlined, size: 16, color: colors.textTertiary),
                               ],
                             ),
-                          ),
-                          Text(
-                            '$percent%',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: progress > 0.85 ? AppColors.expense : AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween<double>(begin: 0, end: progress),
-                          duration: const Duration(milliseconds: 600),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, val, child) {
-                            return LinearProgressIndicator(
-                              value: val,
-                              minHeight: 6,
-                              backgroundColor: AppColors.borderLight,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                val > 0.85 ? AppColors.expense : item.color,
-                              ),
-                            );
-                          },
+                          ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0, end: progress),
+                            duration: const Duration(milliseconds: 600),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, val, child) {
+                              return LinearProgressIndicator(
+                                value: val,
+                                minHeight: 6,
+                                backgroundColor: colors.border,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  val > 0.85 ? colors.expense : cat.iconColor,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -331,59 +323,144 @@ class BudgetScreen extends ConsumerWidget {
     );
   }
 
-  void _editMonthlyBudgetDialog(BuildContext context, WidgetRef ref, double currentBudget) {
-    final controller = TextEditingController(text: currentBudget.toInt().toString());
-    showDialog(
+  void _editMonthlyBudgetDialog(BuildContext context, WidgetRef ref, int currentBudget) {
+    final controller = TextEditingController(
+      text: CurrencyFormatter.format(currentBudget, includeSymbol: false),
+    );
+    final colors = context.appColors;
+
+    showAppModalBottomSheet(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 8,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
           ),
-          title: const Text('Oylik smetani o\'zgartirish'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Yangi budjet summasi',
-              suffixText: 'so\'m',
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Oylik smetani o\'zgartirish',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Yangi oylik limit',
+                  suffixText: 'so\'m',
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: AppDimensions.buttonHeight,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final amt = CurrencyFormatter.parse(controller.text);
+                    if (amt > 0) {
+                      ref.read(budgetProvider.notifier).updateMonthlyBudget(amt);
+                      Navigator.pop(ctx);
+                      HapticUtil.success();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Oylik smeta yangilandi'),
+                          backgroundColor: AppColors.primary,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Bekor qilish'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final amt = double.tryParse(controller.text.replaceAll(' ', '')) ?? currentBudget;
-                ref.read(budgetProvider.notifier).updateMonthlyBudget(amt);
-                Navigator.pop(context);
-              },
-              child: const Text('Saqlash'),
-            ),
-          ],
         );
       },
     );
   }
-}
 
-class _CategoryBudgetData {
-  final String categoryId;
-  final String name;
-  final double spent;
-  final double limit;
-  final Color color;
-  final IconData icon;
+  void _editCategoryLimitDialog(
+    BuildContext context,
+    WidgetRef ref,
+    CategoryItem cat,
+    int currentLimit,
+  ) {
+    final controller = TextEditingController(
+      text: CurrencyFormatter.format(currentLimit, includeSymbol: false),
+    );
+    final colors = context.appColors;
 
-  const _CategoryBudgetData({
-    required this.categoryId,
-    required this.name,
-    required this.spent,
-    required this.limit,
-    required this.color,
-    required this.icon,
-  });
+    showAppModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 8,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${cat.name} limiti',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: '${cat.name} uchun oylik limit',
+                  suffixText: 'so\'m',
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: AppDimensions.buttonHeight,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final amt = CurrencyFormatter.parse(controller.text);
+                    if (amt > 0) {
+                      ref.read(budgetProvider.notifier).updateCategoryLimit(cat.id, amt);
+                      Navigator.pop(ctx);
+                      HapticUtil.success();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${cat.name} limiti yangilandi'),
+                          backgroundColor: AppColors.primary,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

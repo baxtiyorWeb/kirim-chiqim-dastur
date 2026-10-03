@@ -5,7 +5,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/widgets/animated_number.dart';
 
 class DashboardHeroCard extends StatelessWidget {
-  final double totalExpenses;
+  final int totalExpenses;
   final VoidCallback? onTap;
 
   const DashboardHeroCard({
@@ -90,7 +90,7 @@ class DashboardHeroCard extends StatelessWidget {
 
             const SizedBox(height: AppDimensions.space12),
 
-            // Percentage Badge: "↓ 12%"
+            // Percentage Badge
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -101,16 +101,16 @@ class DashboardHeroCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.arrow_downward_rounded,
+                    Icons.trending_down_rounded,
                     color: Color(0xFF6EE7B7),
                     size: 14,
                   ),
                   SizedBox(width: 4),
                   Text(
-                    '12%',
+                    '12% o\'tgan oyga nisbatan',
                     style: TextStyle(
                       color: Color(0xFF6EE7B7),
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

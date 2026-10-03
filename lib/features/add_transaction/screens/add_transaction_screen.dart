@@ -13,26 +13,48 @@ import '../../../data/models/transaction_item.dart';
 import '../../../providers/finance_providers.dart';
 
 class AddTransactionScreen extends ConsumerStatefulWidget {
-  const AddTransactionScreen({super.key});
+  final TransactionItem? existingItem;
+
+  const AddTransactionScreen({
+    super.key,
+    this.existingItem,
+  });
 
   @override
   ConsumerState<AddTransactionScreen> createState() => _AddTransactionScreenState();
 }
 
 class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
-  bool _isExpense = true;
-  double _amount = 0.0;
-  String _selectedCategoryId = 'food';
-  DateTime _selectedDate = DateTime.now();
+  late bool _isExpense;
+  late int _amount;
+  late String _selectedCategoryId;
+  late DateTime _selectedDate;
+  late String _paymentMethod;
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
 
-  final List<double> _quickChips = [10000, 20000, 50000, 100000];
+  final List<int> _quickChips = [10000, 20000, 50000, 100000, 500000];
 
   @override
   void initState() {
     super.initState();
-    _amountController.text = '0';
+    final item = widget.existingItem;
+    if (item != null) {
+      _isExpense = item.isExpense;
+      _amount = item.amount;
+      _selectedCategoryId = item.categoryId;
+      _selectedDate = item.dateTime;
+      _paymentMethod = item.paymentMethod;
+      _noteController.text = item.note ?? item.title;
+      _amountController.text = CurrencyFormatter.format(item.amount, includeSymbol: false);
+    } else {
+      _isExpense = true;
+      _amount = 0;
+      _selectedCategoryId = 'food';
+      _selectedDate = DateTime.now();
+      _paymentMethod = 'cash';
+      _amountController.text = '';
+    }
   }
 
   @override
@@ -43,13 +65,12 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   }
 
   void _onAmountChanged(String val) {
-    final parsed = CurrencyFormatter.parse(val);
     setState(() {
-      _amount = parsed;
+      _amount = CurrencyFormatter.parse(val);
     });
   }
 
-  void _addQuickAmount(double chipAmount) {
+  void _addQuickAmount(int chipAmount) {
     HapticUtil.selection();
     setState(() {
       _amount += chipAmount;
@@ -64,18 +85,6 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: Colors.white,
-              onSurface: AppColors.textPrimary,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
     if (picked != null) {
       setState(() {
@@ -85,11 +94,12 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   }
 
   void _saveTransaction() {
+    final colors = context.appColors;
     if (_amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Iltimos, summani kiriting'),
-          backgroundColor: AppColors.expense,
+        SnackBar(
+          content: const Text('Iltimos, summani kiriting'),
+          backgroundColor: colors.expense,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -101,22 +111,37 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
     final note = _noteController.text.trim();
     final title = note.isNotEmpty ? note : selectedCategory.name;
 
-    final newTransaction = TransactionItem(
-      id: const Uuid().v4(),
-      title: title,
-      amount: _amount,
-      categoryId: _selectedCategoryId,
-      dateTime: _selectedDate,
-      note: note.isNotEmpty ? note : null,
-      isExpense: _isExpense,
-    );
-
-    ref.read(transactionsProvider.notifier).addTransaction(newTransaction);
+    if (widget.existingItem != null) {
+      final updated = widget.existingItem!.copyWith(
+        title: title,
+        amount: _amount,
+        categoryId: _selectedCategoryId,
+        type: _isExpense ? TransactionType.expense : TransactionType.income,
+        dateTime: _selectedDate,
+        note: note.isNotEmpty ? note : null,
+        paymentMethod: _paymentMethod,
+      );
+      ref.read(transactionsProvider.notifier).updateTransaction(updated);
+    } else {
+      final newTransaction = TransactionItem(
+        id: const Uuid().v4(),
+        title: title,
+        amount: _amount,
+        categoryId: _selectedCategoryId,
+        type: _isExpense ? TransactionType.expense : TransactionType.income,
+        dateTime: _selectedDate,
+        note: note.isNotEmpty ? note : null,
+        paymentMethod: _paymentMethod,
+      );
+      ref.read(transactionsProvider.notifier).addTransaction(newTransaction);
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _isExpense ? 'Xarajat muvaffaqiyatli saqlandi' : 'Daromad saqlandi',
+          widget.existingItem != null
+              ? 'Tranzaksiya muvaffaqiyatli yangilandi'
+              : (_isExpense ? 'Xarajat muvaffaqiyatli saqlandi' : 'Daromad saqlandi'),
         ),
         backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
@@ -128,23 +153,26 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final categories = _isExpense
         ? CategoryItem.defaultExpenseCategories
         : CategoryItem.defaultIncomeCategories;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
         title: Text(
-          _isExpense ? AppStrings.addExpense : AppStrings.addIncome,
-          style: const TextStyle(
+          widget.existingItem != null
+              ? (_isExpense ? 'Xarajatni tahrirlash' : 'Daromadni tahrirlash')
+              : (_isExpense ? AppStrings.addExpense : AppStrings.addIncome),
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: colors.textPrimary,
           ),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded, color: colors.textPrimary),
           onPressed: () => context.pop(),
         ),
         actions: [
@@ -153,9 +181,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: colors.card,
               borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: colors.border),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -171,7 +199,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _isExpense ? AppColors.expense : Colors.transparent,
+                      color: _isExpense ? colors.expense : Colors.transparent,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
                     ),
                     child: Text(
@@ -179,7 +207,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: _isExpense ? Colors.white : AppColors.textSecondary,
+                        color: _isExpense ? Colors.white : colors.textSecondary,
                       ),
                     ),
                   ),
@@ -195,7 +223,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: !_isExpense ? AppColors.income : Colors.transparent,
+                      color: !_isExpense ? colors.income : Colors.transparent,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
                     ),
                     child: Text(
@@ -203,7 +231,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: !_isExpense ? Colors.white : AppColors.textSecondary,
+                        color: !_isExpense ? Colors.white : colors.textSecondary,
                       ),
                     ),
                   ),
@@ -219,23 +247,29 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Amount Input Card matching image
+            // Amount Input Card
             Container(
               padding: const EdgeInsets.all(AppDimensions.space16),
               decoration: BoxDecoration(
-                color: AppColors.card,
+                color: colors.card,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: colors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
                   Row(
                     children: [
-                      // Currency Circle Icon
                       Container(
                         width: 44,
                         height: 44,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppColors.primaryLight,
                           shape: BoxShape.circle,
                         ),
@@ -253,10 +287,10 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                           controller: _amountController,
                           keyboardType: TextInputType.number,
                           onChanged: _onAmountChanged,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            color: colors.textPrimary,
                             letterSpacing: -0.5,
                           ),
                           decoration: InputDecoration(
@@ -264,10 +298,10 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
                             suffixText: ' so\'m',
-                            suffixStyle: const TextStyle(
+                            suffixStyle: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
+                              color: colors.textSecondary,
                             ),
                             hintText: '0',
                             filled: false,
@@ -275,49 +309,43 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                           ),
                         ),
                       ),
-
-                      // Green round check/arrow button
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
                     ],
                   ),
 
                   const SizedBox(height: AppDimensions.space16),
 
-                  // Quick Chips: "10 000", "20 000", "50 000", "100 000"
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: _quickChips.map((chipVal) {
-                      return GestureDetector(
-                        onTap: () => _addQuickAmount(chipVal),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceVariant,
-                            borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                          ),
-                          child: Text(
-                            CurrencyFormatter.format(chipVal, includeSymbol: false),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
+                  // Quick Chips: "10 000", "20 000", "50 000", "100 000", "500 000"
+                  SizedBox(
+                    height: 34,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _quickChips.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 8),
+                      itemBuilder: (context, idx) {
+                        final chipVal = _quickChips[idx];
+                        return GestureDetector(
+                          onTap: () => _addQuickAmount(chipVal),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: colors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                              border: Border.all(color: colors.border),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '+${CurrencyFormatter.formatCompact(chipVal)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.textPrimary,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -326,23 +354,24 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
             const SizedBox(height: AppDimensions.space20),
 
             // Note Field: "Izoh (ixtiyoriy)"
-            const Text(
+            Text(
               AppStrings.noteOptional,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: AppDimensions.space8),
             Container(
               decoration: BoxDecoration(
-                color: AppColors.card,
+                color: colors.card,
                 borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: colors.border),
               ),
               child: TextField(
                 controller: _noteController,
+                style: TextStyle(color: colors.textPrimary),
                 decoration: const InputDecoration(
                   hintText: AppStrings.notePlaceholder,
                   border: InputBorder.none,
@@ -357,17 +386,17 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
             const SizedBox(height: AppDimensions.space20),
 
             // Category Selection Header: "Kategoriya"
-            const Text(
+            Text(
               AppStrings.category,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: AppDimensions.space12),
 
-            // Category Grid (4 columns x 2 rows) matching Screen 3
+            // Category Grid
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -393,10 +422,10 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOut,
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFFF0FAF7) : AppColors.card,
+                      color: isSelected ? AppColors.primaryLight : colors.card,
                       borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
                       border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.border,
+                        color: isSelected ? AppColors.primary : colors.border,
                         width: isSelected ? 1.8 : 1.0,
                       ),
                       boxShadow: isSelected
@@ -433,7 +462,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                            color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                            color: isSelected ? AppColors.primary : colors.textPrimary,
                           ),
                         ),
                       ],
@@ -446,12 +475,12 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
             const SizedBox(height: AppDimensions.space20),
 
             // Date Picker Card: "Sana"
-            const Text(
+            Text(
               AppStrings.date,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: colors.textPrimary,
               ),
             ),
             const SizedBox(height: AppDimensions.space8),
@@ -460,25 +489,25 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: AppColors.card,
+                  color: colors.card,
                   borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       DateFormatter.formatDateWithPrefix(_selectedDate),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: colors.textPrimary,
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.calendar_today_rounded,
                       size: 18,
-                      color: AppColors.textSecondary,
+                      color: colors.textSecondary,
                     ),
                   ],
                 ),
@@ -487,7 +516,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 
             const SizedBox(height: AppDimensions.space32),
 
-            // Save Button "Saqlash"
+            // Save Button
             SizedBox(
               width: double.infinity,
               height: AppDimensions.buttonHeight,
@@ -500,9 +529,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                     borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
                   ),
                 ),
-                child: const Text(
-                  AppStrings.save,
-                  style: TextStyle(
+                child: Text(
+                  widget.existingItem != null ? 'Saqlash' : AppStrings.save,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
