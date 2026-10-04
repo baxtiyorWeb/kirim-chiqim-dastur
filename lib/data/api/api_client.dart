@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../../core/constants/api_constants.dart';
 import '../services/local_storage_service.dart';
 
@@ -17,15 +17,13 @@ class ApiException implements Exception {
 
 class ApiClient {
   final LocalStorageService _storage;
-  final HttpClient _httpClient;
+  final http.Client _httpClient;
   String baseUrl;
   void Function()? onUnauthorized;
 
-  ApiClient(this._storage, {String? baseUrl, this.onUnauthorized})
+  ApiClient(this._storage, {String? baseUrl, this.onUnauthorized, http.Client? httpClient})
       : baseUrl = baseUrl ?? ApiConstants.defaultBaseUrl,
-        _httpClient = HttpClient() {
-    _httpClient.connectionTimeout = const Duration(seconds: 12);
-  }
+        _httpClient = httpClient ?? http.Client();
 
   Map<String, String> _buildHeaders() {
     final headers = <String, String>{
@@ -45,7 +43,7 @@ class ApiClient {
     return Uri(
       scheme: base.scheme,
       host: base.host,
-      port: base.port,
+      port: base.hasPort ? base.port : null,
       path: cleanEndpoint,
       queryParameters: queryParams?.map((k, v) => MapEntry(k, v.toString())),
     );
@@ -58,7 +56,6 @@ class ApiClient {
     dynamic body,
     Map<String, dynamic>? queryParams,
   }) async {
-    // List of candidate base URLs to attempt
     final candidates = <String>[baseUrl];
     if (kDebugMode && !baseUrl.startsWith('https://')) {
       if (!candidates.contains('http://127.0.0.1:8080')) {
@@ -69,42 +66,51 @@ class ApiClient {
       }
     }
 
+    final headers = _buildHeaders();
+    final bodyString = body != null ? jsonEncode(body) : null;
+
     for (int i = 0; i < candidates.length; i++) {
       final currentBase = candidates[i];
       try {
         final uri = _buildUri(currentBase, endpoint, queryParams);
-        final request = await _httpClient.openUrl(method, uri).timeout(const Duration(seconds: 25));
-
-        // 1. MUST set all headers BEFORE writing any body data
-        _buildHeaders().forEach((k, v) => request.headers.set(k, v));
-
-        // 2. Write body if present
-        if (body != null) {
-          final bodyBytes = utf8.encode(jsonEncode(body));
-          request.contentLength = bodyBytes.length;
-          request.add(bodyBytes);
+        http.Response response;
+        switch (method.toUpperCase()) {
+          case 'GET':
+            response = await _httpClient.get(uri, headers: headers).timeout(const Duration(seconds: 25));
+            break;
+          case 'POST':
+            response = await _httpClient.post(uri, headers: headers, body: bodyString).timeout(const Duration(seconds: 25));
+            break;
+          case 'PUT':
+            response = await _httpClient.put(uri, headers: headers, body: bodyString).timeout(const Duration(seconds: 25));
+            break;
+          case 'DELETE':
+            response = await _httpClient.delete(uri, headers: headers).timeout(const Duration(seconds: 25));
+            break;
+          default:
+            throw ApiException('Noma\'lum HTTP metod: $method');
         }
 
-        final response = await request.close().timeout(const Duration(seconds: 25));
-        final result = await _processResponse(response);
-        // If successful and on fallback, update baseUrl
+        final result = _processResponse(response);
         if (currentBase != baseUrl) {
           baseUrl = currentBase;
         }
         return result;
-      } on SocketException {
-        continue; // Try next candidate
       } on TimeoutException {
         if (i < candidates.length - 1) {
-          continue; // Try next candidate
+          continue;
         }
         throw ApiException('Server javob berish vaqti tugadi.');
+      } catch (e) {
+        if (i < candidates.length - 1) {
+          continue;
+        }
+        if (e is ApiException) rethrow;
+        throw ApiException('Server bilan aloqa o\'rnatib bo\'lmadi. ($e)');
       }
     }
 
-    throw ApiException(
-      'Server bilan aloqa o\'rnatib bo\'lmadi. Backend ishlayotganligini tekshiring.',
-    );
+    throw ApiException('Server bilan aloqa o\'rnatib bo\'lmadi. Backend ishlayotganligini tekshiring.');
   }
 
   Future<dynamic> get(String endpoint, {Map<String, dynamic>? queryParams}) async {
@@ -123,8 +129,8 @@ class ApiClient {
     return _executeWithFallback('DELETE', endpoint);
   }
 
-  Future<dynamic> _processResponse(HttpClientResponse response) async {
-    final responseBody = await response.transform(utf8.decoder).join();
+  dynamic _processResponse(http.Response response) {
+    final responseBody = response.body;
     dynamic decoded;
     if (responseBody.isNotEmpty) {
       try {
