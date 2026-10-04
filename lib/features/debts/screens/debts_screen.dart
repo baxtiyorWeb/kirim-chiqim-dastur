@@ -107,12 +107,16 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          CurrencyFormatter.format(summary.remainingBorrowed),
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: colors.borrowed,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            CurrencyFormatter.formatAdaptive(summary.remainingBorrowed, includeSymbol: true),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: colors.borrowed,
+                            ),
                           ),
                         ),
                       ],
@@ -163,12 +167,16 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          CurrencyFormatter.format(summary.remainingLent),
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: colors.lent,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            CurrencyFormatter.formatAdaptive(summary.remainingLent, includeSymbol: true),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: colors.lent,
+                            ),
                           ),
                         ),
                       ],
@@ -272,20 +280,31 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        debt.personName,
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          color: colors.textPrimary,
+                                      Expanded(
+                                        child: Text(
+                                          debt.personName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: colors.textPrimary,
+                                          ),
                                         ),
                                       ),
-                                      Text(
-                                        CurrencyFormatter.format(debt.remainingAmount),
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                          color: indicatorColor,
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            CurrencyFormatter.formatAdaptive(debt.remainingAmount, includeSymbol: true),
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700,
+                                              color: indicatorColor,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],

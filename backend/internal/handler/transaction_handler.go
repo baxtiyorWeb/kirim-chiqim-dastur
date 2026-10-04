@@ -22,15 +22,18 @@ func NewTransactionHandler(repo repository.Repository) *TransactionHandler {
 }
 
 type CreateTransactionRequest struct {
-	CategoryID      string    `json:"categoryId"`
-	Title           string    `json:"title"`
-	Amount          int64     `json:"amount"`
-	TransactionType string    `json:"transactionType"` // "expense" or "income"
-	TransactionDate time.Time `json:"transactionDate"`
-	Note            string    `json:"note,omitempty"`
-	PaymentMethod   string    `json:"paymentMethod,omitempty"`
-	PersonName      string    `json:"personName,omitempty"`
-	IsRecurring     bool      `json:"isRecurring,omitempty"`
+	CategoryID      string      `json:"categoryId"`
+	Category        string      `json:"category,omitempty"`
+	Title           string      `json:"title"`
+	Amount          interface{} `json:"amount"`
+	TransactionType string      `json:"transactionType"` // "expense" or "income"
+	Type            string      `json:"type,omitempty"`
+	TransactionDate interface{} `json:"transactionDate,omitempty"`
+	DateTime        interface{} `json:"dateTime,omitempty"`
+	Note            string      `json:"note,omitempty"`
+	PaymentMethod   string      `json:"paymentMethod,omitempty"`
+	PersonName      string      `json:"personName,omitempty"`
+	IsRecurring     bool        `json:"isRecurring,omitempty"`
 }
 
 func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -46,29 +49,44 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Amount <= 0 {
+	amt := parseAmountFlex(req.Amount)
+	if amt <= 0 {
 		writeError(w, http.StatusBadRequest, "Amount must be greater than zero")
 		return
 	}
-	if req.CategoryID == "" {
-		writeError(w, http.StatusBadRequest, "Category ID is required")
-		return
+
+	categoryID := strings.TrimSpace(req.CategoryID)
+	if categoryID == "" {
+		categoryID = strings.TrimSpace(req.Category)
 	}
-	if req.Title == "" {
-		writeError(w, http.StatusBadRequest, "Title is required")
-		return
+	if categoryID == "" {
+		categoryID = "other_expense"
 	}
 
-	txType := strings.ToLower(req.TransactionType)
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		title = "Tranzaksiya"
+	}
+
+	txType := strings.ToLower(strings.TrimSpace(req.TransactionType))
+	if txType == "" {
+		txType = strings.ToLower(strings.TrimSpace(req.Type))
+	}
 	if txType != "income" && txType != "expense" {
 		txType = "expense"
 	}
 
-	if req.TransactionDate.IsZero() {
-		req.TransactionDate = time.Now()
+	dateVal := req.TransactionDate
+	if dateVal == nil {
+		dateVal = req.DateTime
+	}
+	txDate := parseTimeFlex(dateVal)
+	if txDate == nil {
+		now := time.Now()
+		txDate = &now
 	}
 
-	paymentMethod := req.PaymentMethod
+	paymentMethod := strings.TrimSpace(req.PaymentMethod)
 	if paymentMethod == "" {
 		paymentMethod = "cash"
 	}
@@ -76,11 +94,11 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	tx := &models.Transaction{
 		ID:              uuid.New(),
 		UserID:          userID,
-		CategoryID:      req.CategoryID,
-		Title:           req.Title,
-		Amount:          req.Amount,
+		CategoryID:      categoryID,
+		Title:           title,
+		Amount:          amt,
 		TransactionType: txType,
-		TransactionDate: req.TransactionDate,
+		TransactionDate: *txDate,
 		Note:            req.Note,
 		PaymentMethod:   paymentMethod,
 		PersonName:      req.PersonName,
@@ -188,18 +206,61 @@ func (h *TransactionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	amt := parseAmountFlex(req.Amount)
+	if amt <= 0 {
+		writeError(w, http.StatusBadRequest, "Amount must be greater than zero")
+		return
+	}
+
+	categoryID := strings.TrimSpace(req.CategoryID)
+	if categoryID == "" {
+		categoryID = strings.TrimSpace(req.Category)
+	}
+	if categoryID == "" {
+		categoryID = "other_expense"
+	}
+
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		title = "Tranzaksiya"
+	}
+
+	txType := strings.ToLower(strings.TrimSpace(req.TransactionType))
+	if txType == "" {
+		txType = strings.ToLower(strings.TrimSpace(req.Type))
+	}
+	if txType != "income" && txType != "expense" {
+		txType = "expense"
+	}
+
+	dateVal := req.TransactionDate
+	if dateVal == nil {
+		dateVal = req.DateTime
+	}
+	txDate := parseTimeFlex(dateVal)
+	if txDate == nil {
+		now := time.Now()
+		txDate = &now
+	}
+
+	paymentMethod := strings.TrimSpace(req.PaymentMethod)
+	if paymentMethod == "" {
+		paymentMethod = "cash"
+	}
+
 	tx := &models.Transaction{
 		ID:              id,
 		UserID:          userID,
-		CategoryID:      req.CategoryID,
-		Title:           req.Title,
-		Amount:          req.Amount,
-		TransactionType: req.TransactionType,
-		TransactionDate: req.TransactionDate,
+		CategoryID:      categoryID,
+		Title:           title,
+		Amount:          amt,
+		TransactionType: txType,
+		TransactionDate: *txDate,
 		Note:            req.Note,
-		PaymentMethod:   req.PaymentMethod,
+		PaymentMethod:   paymentMethod,
 		PersonName:      req.PersonName,
 		IsRecurring:     req.IsRecurring,
+		UpdatedAt:       time.Now(),
 	}
 
 	if err := h.repo.UpdateTransaction(r.Context(), tx); err != nil {

@@ -323,20 +323,23 @@ func (r *PostgresRepository) GetBudgetByMonth(ctx context.Context, userID uuid.U
 		&b.ID, &b.UserID, &b.YearMonth, &b.TotalMonthlyLimit, &b.IsActive, &b.CreatedAt, &b.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
-		// Create default budget record for this month
-		b.ID = uuid.New()
-		b.UserID = userID
-		b.YearMonth = yearMonth
-		b.TotalMonthlyLimit = 0 // Default 0 (no budget set until user configures it)
-		b.IsActive = true
-		b.CreatedAt = time.Now()
-		b.UpdatedAt = time.Now()
+		// Create default budget record for this month (limit 0 until configured)
 		insertQ := `
 			INSERT INTO budgets (id, user_id, year_month, total_monthly_limit, is_active, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			ON CONFLICT (user_id, year_month) DO NOTHING
+			ON CONFLICT (user_id, year_month)
+			DO UPDATE SET updated_at = budgets.updated_at
+			RETURNING id, total_monthly_limit, is_active, created_at, updated_at
 		`
-		_, _ = r.db.ExecContext(ctx, insertQ, b.ID, b.UserID, b.YearMonth, b.TotalMonthlyLimit, b.IsActive, b.CreatedAt, b.UpdatedAt)
+		newID := uuid.New()
+		now := time.Now()
+		b.UserID = userID
+		b.YearMonth = yearMonth
+		if err := r.db.QueryRowContext(ctx, insertQ, newID, userID, yearMonth, 0, true, now, now).Scan(
+			&b.ID, &b.TotalMonthlyLimit, &b.IsActive, &b.CreatedAt, &b.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
 	} else if err != nil {
 		return nil, err
 	}

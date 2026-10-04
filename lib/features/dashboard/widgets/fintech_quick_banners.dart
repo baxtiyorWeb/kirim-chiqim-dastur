@@ -101,20 +101,33 @@ class FintechQuickBanners extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Sarflangan: ${CurrencyFormatter.format(budgetSpent)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: colors.textSecondary,
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Sarflangan: ${CurrencyFormatter.formatAdaptive(budgetSpent, includeSymbol: true)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: colors.textSecondary,
+                            ),
+                          ),
                         ),
                       ),
-                      Text(
-                        'Limit: ${CurrencyFormatter.format(budgetTotal)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: colors.textPrimary,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'Limit: ${CurrencyFormatter.formatAdaptive(budgetTotal, includeSymbol: true)}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: colors.textPrimary,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -180,35 +193,47 @@ class FintechQuickBanners extends StatelessWidget {
                         Row(
                           children: [
                             // Borrowed Red indicator
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colors.borrowedBg,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Olingan: ${CurrencyFormatter.formatCompact(debtsSummary.remainingBorrowed)}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.borrowed,
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: colors.borrowedBg,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Olingan: ${CurrencyFormatter.formatCompactUz(debtsSummary.remainingBorrowed, includeSymbol: true)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: colors.borrowed,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 8),
                             // Lent Green indicator
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colors.lentBg,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Berilgan: ${CurrencyFormatter.formatCompact(debtsSummary.remainingLent)}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.lent,
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: colors.lentBg,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Berilgan: ${CurrencyFormatter.formatCompactUz(debtsSummary.remainingLent, includeSymbol: true)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: colors.lent,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),

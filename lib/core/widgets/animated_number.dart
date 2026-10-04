@@ -8,6 +8,9 @@ class AnimatedCurrencyText extends StatefulWidget {
   final Duration duration;
   final Curve curve;
   final String prefix;
+  final bool adaptive;
+  final num adaptiveThreshold;
+  final AlignmentGeometry alignment;
 
   const AnimatedCurrencyText({
     super.key,
@@ -17,6 +20,9 @@ class AnimatedCurrencyText extends StatefulWidget {
     this.duration = const Duration(milliseconds: 600),
     this.curve = Curves.easeOutCubic,
     this.prefix = '',
+    this.adaptive = true,
+    this.adaptiveThreshold = 1000000,
+    this.alignment = Alignment.centerLeft,
   });
 
   @override
@@ -40,14 +46,31 @@ class _AnimatedCurrencyTextState extends State<AnimatedCurrencyText> {
     }
   }
 
+  String _format(num amt) {
+    if (widget.adaptive) {
+      return CurrencyFormatter.formatAdaptive(
+        amt,
+        includeSymbol: widget.includeSymbol,
+        threshold: widget.adaptiveThreshold,
+      );
+    }
+    return CurrencyFormatter.format(amt, includeSymbol: widget.includeSymbol);
+  }
+
   @override
   Widget build(BuildContext context) {
     final disableAnimations = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
     if (disableAnimations) {
-      return Text(
-        '${widget.prefix}${CurrencyFormatter.format(widget.amount, includeSymbol: widget.includeSymbol)}',
-        style: widget.style,
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: widget.alignment,
+        child: Text(
+          '${widget.prefix}${_format(widget.amount)}',
+          style: widget.style,
+          maxLines: 1,
+          softWrap: false,
+        ),
       );
     }
 
@@ -57,13 +80,16 @@ class _AnimatedCurrencyTextState extends State<AnimatedCurrencyText> {
       duration: widget.duration,
       curve: widget.curve,
       builder: (context, value, child) {
-        final formatted = CurrencyFormatter.format(
-          value.round(),
-          includeSymbol: widget.includeSymbol,
-        );
-        return Text(
-          '${widget.prefix}$formatted',
-          style: widget.style,
+        final formatted = _format(value.round());
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: widget.alignment,
+          child: Text(
+            '${widget.prefix}$formatted',
+            style: widget.style,
+            maxLines: 1,
+            softWrap: false,
+          ),
         );
       },
     );

@@ -20,14 +20,14 @@ func NewGoalHandler(repo repository.Repository) *GoalHandler {
 }
 
 type CreateGoalRequest struct {
-	Title        string     `json:"title"`
-	TargetAmount int64      `json:"targetAmount"`
-	Deadline     *time.Time `json:"deadline,omitempty"`
-	Emoji        string     `json:"emoji,omitempty"`
+	Title        string      `json:"title"`
+	TargetAmount interface{} `json:"targetAmount"`
+	Deadline     interface{} `json:"deadline,omitempty"`
+	Emoji        string      `json:"emoji,omitempty"`
 }
 
 type DepositGoalRequest struct {
-	Amount int64 `json:"amount"`
+	Amount interface{} `json:"amount"`
 }
 
 func (h *GoalHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +47,9 @@ func (h *GoalHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Goal title is required")
 		return
 	}
-	if req.TargetAmount <= 0 {
+
+	targetAmt := parseAmountFlex(req.TargetAmount)
+	if targetAmt <= 0 {
 		writeError(w, http.StatusBadRequest, "Target amount must be greater than zero")
 		return
 	}
@@ -57,13 +59,15 @@ func (h *GoalHandler) Create(w http.ResponseWriter, r *http.Request) {
 		emoji = "🎯"
 	}
 
+	deadline := parseTimeFlex(req.Deadline)
+
 	goal := &models.SavingsGoal{
 		ID:            uuid.New(),
 		UserID:        userID,
 		Title:         req.Title,
-		TargetAmount:  req.TargetAmount,
+		TargetAmount:  targetAmt,
 		CurrentAmount: 0,
-		Deadline:      req.Deadline,
+		Deadline:      deadline,
 		Emoji:         emoji,
 		IsCompleted:   false,
 		CreatedAt:     time.Now(),
@@ -118,12 +122,13 @@ func (h *GoalHandler) Deposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Amount <= 0 {
+	amt := parseAmountFlex(req.Amount)
+	if amt <= 0 {
 		writeError(w, http.StatusBadRequest, "Deposit amount must be positive")
 		return
 	}
 
-	if err := h.repo.AddGoalDeposit(r.Context(), userID, id, req.Amount); err != nil {
+	if err := h.repo.AddGoalDeposit(r.Context(), userID, id, amt); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to deposit to savings goal")
 		return
 	}

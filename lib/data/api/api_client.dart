@@ -52,10 +52,11 @@ class ApiClient {
 
   /// Executes request with automatic fallback (e.g. LAN IP -> USB localhost)
   Future<dynamic> _executeWithFallback(
-    Future<HttpClientRequest> Function(Uri uri) requestFactory,
-    String endpoint, [
+    String method,
+    String endpoint, {
+    dynamic body,
     Map<String, dynamic>? queryParams,
-  ]) async {
+  }) async {
     // List of candidate base URLs to attempt
     final candidates = <String>[baseUrl];
     if (baseUrl.contains('192.168.') || baseUrl.contains('10.0.2.2')) {
@@ -67,8 +68,17 @@ class ApiClient {
       final currentBase = candidates[i];
       try {
         final uri = _buildUri(currentBase, endpoint, queryParams);
-        final request = await requestFactory(uri).timeout(const Duration(seconds: 12));
+        final request = await _httpClient.openUrl(method, uri).timeout(const Duration(seconds: 12));
+
+        // 1. MUST set all headers BEFORE writing any body data
         _buildHeaders().forEach((k, v) => request.headers.set(k, v));
+
+        // 2. Write body if present
+        if (body != null) {
+          final bodyBytes = utf8.encode(jsonEncode(body));
+          request.contentLength = bodyBytes.length;
+          request.add(bodyBytes);
+        }
 
         final response = await request.close().timeout(const Duration(seconds: 12));
         final result = await _processResponse(response);
@@ -90,44 +100,19 @@ class ApiClient {
   }
 
   Future<dynamic> get(String endpoint, {Map<String, dynamic>? queryParams}) async {
-    return _executeWithFallback(
-      (uri) => _httpClient.getUrl(uri),
-      endpoint,
-      queryParams,
-    );
+    return _executeWithFallback('GET', endpoint, queryParams: queryParams);
   }
 
   Future<dynamic> post(String endpoint, {dynamic body}) async {
-    return _executeWithFallback(
-      (uri) async {
-        final req = await _httpClient.postUrl(uri);
-        if (body != null) {
-          req.write(jsonEncode(body));
-        }
-        return req;
-      },
-      endpoint,
-    );
+    return _executeWithFallback('POST', endpoint, body: body);
   }
 
   Future<dynamic> put(String endpoint, {dynamic body}) async {
-    return _executeWithFallback(
-      (uri) async {
-        final req = await _httpClient.putUrl(uri);
-        if (body != null) {
-          req.write(jsonEncode(body));
-        }
-        return req;
-      },
-      endpoint,
-    );
+    return _executeWithFallback('PUT', endpoint, body: body);
   }
 
   Future<dynamic> delete(String endpoint) async {
-    return _executeWithFallback(
-      (uri) => _httpClient.deleteUrl(uri),
-      endpoint,
-    );
+    return _executeWithFallback('DELETE', endpoint);
   }
 
   Future<dynamic> _processResponse(HttpClientResponse response) async {

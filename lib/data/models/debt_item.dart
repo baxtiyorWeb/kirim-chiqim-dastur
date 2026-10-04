@@ -49,7 +49,7 @@ class DebtRepayment {
       'id': id,
       'debtId': debtId,
       'amount': amount,
-      'date': date.toIso8601String(),
+      'date': date.toUtc().toIso8601String(),
       'note': note,
     };
   }
@@ -140,16 +140,16 @@ class DebtItem {
       'phoneNumber': phoneNumber,
       'amount': amount,
       'paidAmount': paidAmount,
-      'date': date.toIso8601String(),
-      'dueDate': dueDate?.toIso8601String(),
+      'date': date.toUtc().toIso8601String(),
+      'dueDate': dueDate?.toUtc().toIso8601String(),
       'status': status == DebtStatus.partiallyPaid ? 'partially_paid' : status.name,
       'type': type.name,
       'debtType': type.name,
       'isBorrowed': isBorrowed, // backward compatibility
       'note': note,
       'repayments': repayments.map((r) => r.toJson()).toList(),
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'createdAt': createdAt.toUtc().toIso8601String(),
+      'updatedAt': updatedAt.toUtc().toIso8601String(),
     };
   }
 

@@ -126,12 +126,16 @@ class _AnimatedDonutChartWidgetState extends State<AnimatedDonutChartWidget>
                     const SizedBox(width: 10),
 
                     // Amount
-                    Text(
-                      CurrencyFormatter.formatCompact(item.amount),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        CurrencyFormatter.formatCompactUz(item.amount),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: colors.textPrimary,
+                        ),
                       ),
                     ),
                   ],

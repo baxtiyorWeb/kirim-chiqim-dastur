@@ -20,14 +20,16 @@ func NewBudgetHandler(repo repository.Repository) *BudgetHandler {
 }
 
 type UpdateBudgetRequest struct {
-	YearMonth         string `json:"yearMonth"`
-	TotalMonthlyLimit int64  `json:"totalMonthlyLimit"`
+	YearMonth         string      `json:"yearMonth"`
+	TotalMonthlyLimit interface{} `json:"totalMonthlyLimit"`
+	Limit             interface{} `json:"limit,omitempty"`
 }
 
 type SetCategoryLimitRequest struct {
-	YearMonth   string `json:"yearMonth"`
-	CategoryID  string `json:"categoryId"`
-	LimitAmount int64  `json:"limitAmount"`
+	YearMonth   string      `json:"yearMonth"`
+	CategoryID  string      `json:"categoryId"`
+	LimitAmount interface{} `json:"limitAmount"`
+	Limit       interface{} `json:"limit,omitempty"`
 }
 
 func (h *BudgetHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -64,10 +66,15 @@ func (h *BudgetHandler) UpdateTotal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	totalLimit := parseAmountFlex(req.TotalMonthlyLimit)
+	if totalLimit == 0 && req.Limit != nil {
+		totalLimit = parseAmountFlex(req.Limit)
+	}
+
 	if req.YearMonth == "" {
 		req.YearMonth = time.Now().Format("2006-01")
 	}
-	if req.TotalMonthlyLimit < 0 {
+	if totalLimit < 0 {
 		writeError(w, http.StatusBadRequest, "Monthly limit cannot be negative")
 		return
 	}
@@ -83,7 +90,7 @@ func (h *BudgetHandler) UpdateTotal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	budget.TotalMonthlyLimit = req.TotalMonthlyLimit
+	budget.TotalMonthlyLimit = totalLimit
 	budget.UpdatedAt = time.Now()
 
 	if err := h.repo.CreateOrUpdateBudget(r.Context(), budget); err != nil {
@@ -114,11 +121,16 @@ func (h *BudgetHandler) SetCategoryLimit(w http.ResponseWriter, r *http.Request)
 		req.CategoryID = pathCatID
 	}
 
+	limitAmt := parseAmountFlex(req.LimitAmount)
+	if limitAmt == 0 && req.Limit != nil {
+		limitAmt = parseAmountFlex(req.Limit)
+	}
+
 	if req.CategoryID == "" {
 		writeError(w, http.StatusBadRequest, "Category ID is required")
 		return
 	}
-	if req.LimitAmount < 0 {
+	if limitAmt < 0 {
 		writeError(w, http.StatusBadRequest, "Limit amount cannot be negative")
 		return
 	}
@@ -132,7 +144,7 @@ func (h *BudgetHandler) SetCategoryLimit(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.repo.SetCategoryLimit(r.Context(), userID, budget.ID, req.CategoryID, req.LimitAmount); err != nil {
+	if err := h.repo.SetCategoryLimit(r.Context(), userID, budget.ID, req.CategoryID, limitAmt); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to save category limit")
 		return
 	}

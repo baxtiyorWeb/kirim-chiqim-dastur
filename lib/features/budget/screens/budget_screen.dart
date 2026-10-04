@@ -108,29 +108,32 @@ class BudgetScreen extends ConsumerWidget {
 
                   const SizedBox(height: 12),
 
-                  // Progress numbers
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        CurrencyFormatter.format(totalSpent, includeSymbol: false),
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          color: colors.textPrimary,
-                          letterSpacing: -0.5,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          CurrencyFormatter.formatAdaptive(totalSpent, includeSymbol: false),
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: colors.textPrimary,
+                            letterSpacing: -0.5,
+                          ),
                         ),
-                      ),
-                      Text(
-                        ' / ${CurrencyFormatter.format(totalBudget)}',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: colors.textSecondary,
+                        Text(
+                          ' / ${CurrencyFormatter.formatAdaptive(totalBudget, includeSymbol: true)}',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: colors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 14),
@@ -169,12 +172,18 @@ class BudgetScreen extends ConsumerWidget {
                           color: colors.textSecondary,
                         ),
                       ),
-                      Text(
-                        CurrencyFormatter.format(remaining),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            CurrencyFormatter.formatAdaptive(remaining, includeSymbol: true),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -268,12 +277,15 @@ class BudgetScreen extends ConsumerWidget {
                                       color: colors.textPrimary,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${CurrencyFormatter.formatCompact(spent)} / ${CurrencyFormatter.formatCompact(limit)} so\'m',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: colors.textSecondary,
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '${CurrencyFormatter.formatCompactUz(spent)} / ${CurrencyFormatter.formatCompactUz(limit, includeSymbol: true)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colors.textSecondary,
+                                      ),
                                     ),
                                   ),
                                 ],

@@ -115,12 +115,15 @@ class _AnimatedBarChartWidgetState extends State<AnimatedBarChartWidget>
                             ),
                           ],
                         ),
-                        child: Text(
-                          CurrencyFormatter.formatCompact(item.amount),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            CurrencyFormatter.formatCompactUz(item.amount),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       )

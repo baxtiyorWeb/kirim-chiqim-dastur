@@ -20,9 +20,9 @@ void main() {
     });
 
     test('compact formatting produces clean fintech labels', () {
-      expect(CurrencyFormatter.formatCompact(500000), "500k");
-      expect(CurrencyFormatter.formatCompact(1500000), "1.5M");
-      expect(CurrencyFormatter.formatCompact(18000000), "18M");
+      expect(CurrencyFormatter.formatCompact(500000), "500 ming");
+      expect(CurrencyFormatter.formatCompact(1500000), "1.5 mln");
+      expect(CurrencyFormatter.formatCompact(18000000), "18 mln");
       expect(CurrencyFormatter.formatCompact(250), "250");
     });
 

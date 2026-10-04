@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,17 +21,19 @@ func NewDebtHandler(repo repository.Repository) *DebtHandler {
 }
 
 type CreateDebtRequest struct {
-	PersonName  string     `json:"personName"`
-	PhoneNumber string     `json:"phoneNumber,omitempty"`
-	Amount      int64      `json:"amount"`
-	DebtType    string     `json:"debtType"` // "borrowed" or "lent"
-	DueDate     *time.Time `json:"dueDate,omitempty"`
-	Note        string     `json:"note,omitempty"`
+	PersonName  string      `json:"personName"`
+	PhoneNumber string      `json:"phoneNumber,omitempty"`
+	Amount      interface{} `json:"amount"`
+	DebtType    string      `json:"debtType"` // "borrowed" or "lent"
+	Type        string      `json:"type,omitempty"`
+	DueDate     interface{} `json:"dueDate,omitempty"`
+	Date        interface{} `json:"date,omitempty"`
+	Note        string      `json:"note,omitempty"`
 }
 
 type RepayDebtRequest struct {
-	Amount int64  `json:"amount"`
-	Note   string `json:"note,omitempty"`
+	Amount interface{} `json:"amount"`
+	Note   string      `json:"note,omitempty"`
 }
 
 func (h *DebtHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -46,28 +49,38 @@ func (h *DebtHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.PersonName == "" {
+	personName := strings.TrimSpace(req.PersonName)
+	if personName == "" {
 		writeError(w, http.StatusBadRequest, "Person name is required")
 		return
 	}
-	if req.Amount <= 0 {
+
+	amt := parseAmountFlex(req.Amount)
+	if amt <= 0 {
 		writeError(w, http.StatusBadRequest, "Debt amount must be greater than zero")
 		return
 	}
-	if req.DebtType != "borrowed" && req.DebtType != "lent" {
-		req.DebtType = "lent"
+
+	debtType := strings.ToLower(strings.TrimSpace(req.DebtType))
+	if debtType == "" {
+		debtType = strings.ToLower(strings.TrimSpace(req.Type))
 	}
+	if debtType != "borrowed" && debtType != "lent" {
+		debtType = "lent"
+	}
+
+	dueDate := parseTimeFlex(req.DueDate)
 
 	debt := &models.Debt{
 		ID:          uuid.New(),
 		UserID:      userID,
-		PersonName:  req.PersonName,
+		PersonName:  personName,
 		PhoneNumber: req.PhoneNumber,
-		Amount:      req.Amount,
+		Amount:      amt,
 		PaidAmount:  0,
-		DebtType:    req.DebtType,
+		DebtType:    debtType,
 		Status:      "active",
-		DueDate:     req.DueDate,
+		DueDate:     dueDate,
 		Note:        req.Note,
 		Repayments:  []models.DebtRepayment{},
 		CreatedAt:   time.Now(),
@@ -148,12 +161,13 @@ func (h *DebtHandler) Repay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Amount <= 0 {
+	amt := parseAmountFlex(req.Amount)
+	if amt <= 0 {
 		writeError(w, http.StatusBadRequest, "Repayment amount must be positive")
 		return
 	}
 
-	if err := h.repo.AddRepayment(r.Context(), userID, id, req.Amount, req.Note); err != nil {
+	if err := h.repo.AddRepayment(r.Context(), userID, id, amt, req.Note); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to record repayment")
 		return
 	}

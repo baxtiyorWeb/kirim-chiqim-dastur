@@ -113,12 +113,15 @@ class GoalsScreen extends ConsumerWidget {
                                       color: colors.textPrimary,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${CurrencyFormatter.format(goal.currentAmount)} / ${CurrencyFormatter.format(goal.targetAmount)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: colors.textSecondary,
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '${CurrencyFormatter.formatAdaptive(goal.currentAmount, includeSymbol: false)} / ${CurrencyFormatter.formatAdaptive(goal.targetAmount, includeSymbol: true)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: colors.textSecondary,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -161,14 +164,20 @@ class GoalsScreen extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              goal.isCompleted
-                                  ? '🎉 Maqsadga erishildi!'
-                                  : 'Qoldi: ${CurrencyFormatter.format(goal.remainingAmount)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: goal.isCompleted ? colors.income : colors.textSecondary,
+                            Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  goal.isCompleted
+                                      ? '🎉 Maqsadga erishildi!'
+                                      : 'Qoldi: ${CurrencyFormatter.formatAdaptive(goal.remainingAmount, includeSymbol: true)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: goal.isCompleted ? colors.income : colors.textSecondary,
+                                  ),
+                                ),
                               ),
                             ),
                             Row(
