@@ -59,11 +59,13 @@ class ApiClient {
   }) async {
     // List of candidate base URLs to attempt
     final candidates = <String>[baseUrl];
-    if (!candidates.contains('http://127.0.0.1:8080')) {
-      candidates.add('http://127.0.0.1:8080');
-    }
-    if (!candidates.contains('http://localhost:8080')) {
-      candidates.add('http://localhost:8080');
+    if (kDebugMode && !baseUrl.startsWith('https://')) {
+      if (!candidates.contains('http://127.0.0.1:8080')) {
+        candidates.add('http://127.0.0.1:8080');
+      }
+      if (!candidates.contains('http://localhost:8080')) {
+        candidates.add('http://localhost:8080');
+      }
     }
 
     for (int i = 0; i < candidates.length; i++) {

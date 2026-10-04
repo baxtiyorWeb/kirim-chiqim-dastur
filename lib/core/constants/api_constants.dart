@@ -2,8 +2,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class ApiConstants {
-  // Configurable base URL
-  // Default for physical Android devices with 'adb reverse tcp:8080 tcp:8080': 127.0.0.1
+  // Live Production Backend on Render
+  static const String productionBaseUrl = 'https://kirim-chiqim-dastur.onrender.com';
+
   static const String _defaultHost = '127.0.0.1';
   static const String _defaultPort = '8080';
 
@@ -11,6 +12,10 @@ class ApiConstants {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) {
       return fromEnv;
+    }
+    // When distributed as a release APK or run in release mode, use the live production server!
+    if (kReleaseMode) {
+      return productionBaseUrl;
     }
     if (kIsWeb) {
       return 'http://localhost:$_defaultPort';
