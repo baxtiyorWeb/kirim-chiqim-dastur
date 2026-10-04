@@ -125,8 +125,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           ),
         ],
       ),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(transactionsProvider.notifier).refresh();
+          await ref.read(dashboardSummaryProvider.notifier).refresh();
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
         slivers: [
           // Month Selector: "<   Sentabr 2026 v   >"
           SliverToBoxAdapter(
@@ -508,8 +513,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _filterChip(String id, String label) {
     final colors = context.appColors;

@@ -51,10 +51,15 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
         icon: const Icon(Icons.add_rounded),
         label: const Text('Qarz qo\'shish', style: TextStyle(fontWeight: FontWeight.w600)),
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(debtsProvider.notifier).refresh();
+          await ref.read(dashboardSummaryProvider.notifier).refresh();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
+          child: Column(
           children: [
             const SizedBox(height: AppDimensions.space12),
 
@@ -379,9 +384,9 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                               ),
                             ),
 
-                            if (debt.status != DebtStatus.returned)
-                              Row(
-                                children: [
+                            Row(
+                              children: [
+                                if (debt.status != DebtStatus.returned) ...[
                                   // Record partial payment
                                   TextButton(
                                     onPressed: () => showDebtPaymentSheet(context, ref, debt),
@@ -398,7 +403,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                       );
                                       if (confirm == true) {
                                         HapticUtil.success();
-                                        ref.read(debtsProvider.notifier).markAsReturned(debt.id);
+                                        await ref.read(debtsProvider.notifier).markAsReturned(debt.id);
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
@@ -413,8 +418,36 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                       style: TextStyle(fontSize: 12, color: Colors.white),
                                     ),
                                   ),
+                                  const SizedBox(width: 4),
                                 ],
-                              ),
+                                IconButton(
+                                  icon: Icon(Icons.delete_outline_rounded, size: 18, color: colors.textTertiary),
+                                  tooltip: 'Qarzni o\'chirish',
+                                  onPressed: () async {
+                                    final confirm = await showConfirmSheet(
+                                      context: context,
+                                      title: 'Qarzni o\'chirish',
+                                      message: '${debt.personName} bilan bo\'lgan qarz ma\'lumoti butunlay o\'chiriladi. Rozimisiz?',
+                                      confirmLabel: 'O\'chirish',
+                                      isDestructive: true,
+                                      icon: Icons.delete_outline_rounded,
+                                    );
+                                    if (confirm == true) {
+                                      HapticUtil.medium();
+                                      await ref.read(debtsProvider.notifier).deleteDebt(debt.id);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Qarz o\'chirildi'),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ],
@@ -427,8 +460,9 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _filterTab(int index, String title) {
     final colors = context.appColors;
@@ -621,7 +655,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                       width: double.infinity,
                       height: AppDimensions.buttonHeight,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           final name = nameController.text.trim();
                           final amt = CurrencyFormatter.parse(amountController.text);
                           if (name.isNotEmpty && amt > 0) {
@@ -638,16 +672,32 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                                   ? noteController.text.trim()
                                   : null,
                             );
-                            ref.read(debtsProvider.notifier).addDebt(newDebt);
-                            Navigator.pop(ctx);
-                            HapticUtil.success();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Qarz muvaffaqiyatli saqlandi'),
-                                backgroundColor: AppColors.primary,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                            try {
+                              await ref.read(debtsProvider.notifier).addDebt(newDebt);
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                              }
+                              HapticUtil.success();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Qarz muvaffaqiyatli saqlandi'),
+                                    backgroundColor: AppColors.primary,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Xatolik: $e'),
+                                    backgroundColor: colors.expense,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
                           }
                         },
                         child: const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),

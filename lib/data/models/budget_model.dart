@@ -47,16 +47,31 @@ class BudgetModel {
   }
 
   factory BudgetModel.fromJson(Map<String, dynamic> json) {
-    final rawLimits = json['categoryLimits'] as Map<String, dynamic>? ?? {};
-    final parsedLimits = rawLimits.map((k, v) => MapEntry(k, (v as num).round()));
+    Map<String, int> parsedLimits = {};
+    if (json['categoryLimits'] is List) {
+      final list = json['categoryLimits'] as List;
+      for (final item in list) {
+        if (item is Map) {
+          final catId = item['categoryId']?.toString();
+          final limit = item['limitAmount'];
+          if (catId != null && limit is num) {
+            parsedLimits[catId] = limit.round();
+          }
+        }
+      }
+    } else if (json['categoryLimits'] is Map) {
+      final rawLimits = json['categoryLimits'] as Map<String, dynamic>;
+      parsedLimits = rawLimits.map((k, v) => MapEntry(k, (v as num).round()));
+    }
 
-    final rawBudget = json['totalMonthlyBudget'];
+    final rawBudget = json['totalMonthlyBudget'] ?? json['totalMonthlyLimit'];
     final int parsedTotal = rawBudget is num ? rawBudget.round() : 3000000;
 
     return BudgetModel(
       totalMonthlyBudget: parsedTotal,
       categoryLimits: parsedLimits,
-      isEnabled: json['isEnabled'] as bool? ?? true,
+      isEnabled: json['isEnabled'] as bool? ?? json['isActive'] as bool? ?? true,
     );
   }
 }
+

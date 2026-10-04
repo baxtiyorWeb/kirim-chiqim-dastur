@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.example.thego_getters"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -42,10 +42,6 @@ android {
             keepDebugSymbols.add("**/*.so")
         }
     }
-}
-
-tasks.matching { it.name.startsWith("strip") }.configureEach {
-    enabled = false
 }
 
 kotlin {

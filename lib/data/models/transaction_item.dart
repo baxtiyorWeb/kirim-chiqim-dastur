@@ -74,7 +74,9 @@ class TransactionItem {
       'amount': amount,
       'categoryId': categoryId,
       'type': type.name,
+      'transactionType': type.name,
       'dateTime': dateTime.toIso8601String(),
+      'transactionDate': dateTime.toIso8601String(),
       'note': note,
       'paymentMethod': paymentMethod,
       'personName': personName,
@@ -82,18 +84,18 @@ class TransactionItem {
       'isRecurring': isRecurring,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
-      'isExpense': isExpense, // backward compatibility
+      'isExpense': isExpense,
     };
   }
 
   factory TransactionItem.fromJson(Map<String, dynamic> json) {
-    // Robust parsing for int or double amounts
     final rawAmount = json['amount'];
     final int parsedAmount = rawAmount is num ? rawAmount.round() : 0;
 
     TransactionType parsedType;
-    if (json.containsKey('type') && json['type'] != null) {
-      final typeStr = json['type'].toString().toLowerCase();
+    final typeField = json['type'] ?? json['transactionType'];
+    if (typeField != null) {
+      final typeStr = typeField.toString().toLowerCase();
       parsedType = TransactionType.values.firstWhere(
         (e) => e.name == typeStr,
         orElse: () => TransactionType.expense,
@@ -103,7 +105,8 @@ class TransactionItem {
       parsedType = isExp ? TransactionType.expense : TransactionType.income;
     }
 
-    final date = DateTime.tryParse(json['dateTime']?.toString() ?? '') ?? DateTime.now();
+    final rawDateStr = json['dateTime'] ?? json['transactionDate'] ?? json['createdAt'];
+    final date = DateTime.tryParse(rawDateStr?.toString() ?? '') ?? DateTime.now();
 
     return TransactionItem(
       id: json['id'] as String? ?? '',

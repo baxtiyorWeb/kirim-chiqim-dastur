@@ -58,6 +58,8 @@ class AppColors {
   static const Color expense = Color(0xFFDC2626);
   static const Color expenseLight = Color(0xFFFEE2E2);
   static const Color expenseDarkBg = Color(0xFF3B1818);
+  static const Color error = Color(0xFFDC2626);
+  static const Color errorLight = Color(0xFFFEE2E2);
 
   static const Color warning = Color(0xFFD97706);
   static const Color warningLight = Color(0xFFFEF3C7);

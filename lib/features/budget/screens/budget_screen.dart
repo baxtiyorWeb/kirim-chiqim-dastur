@@ -46,10 +46,15 @@ class BudgetScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(budgetProvider.notifier).refresh();
+          await ref.read(dashboardSummaryProvider.notifier).refresh();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: AppDimensions.space12),
@@ -320,8 +325,9 @@ class BudgetScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _editMonthlyBudgetDialog(BuildContext context, WidgetRef ref, int currentBudget) {
     final controller = TextEditingController(
@@ -366,19 +372,33 @@ class BudgetScreen extends ConsumerWidget {
                 width: double.infinity,
                 height: AppDimensions.buttonHeight,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final amt = CurrencyFormatter.parse(controller.text);
                     if (amt > 0) {
-                      ref.read(budgetProvider.notifier).updateMonthlyBudget(amt);
-                      Navigator.pop(ctx);
-                      HapticUtil.success();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Oylik smeta yangilandi'),
-                          backgroundColor: AppColors.primary,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                      try {
+                        await ref.read(budgetProvider.notifier).updateMonthlyBudget(amt);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        HapticUtil.success();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Oylik smeta yangilandi'),
+                              backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text('Xatolik: $e'),
+                              backgroundColor: colors.expense,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
                     }
                   },
                   child: const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -406,12 +426,7 @@ class BudgetScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) {
         return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 8,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,19 +454,33 @@ class BudgetScreen extends ConsumerWidget {
                 width: double.infinity,
                 height: AppDimensions.buttonHeight,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final amt = CurrencyFormatter.parse(controller.text);
                     if (amt > 0) {
-                      ref.read(budgetProvider.notifier).updateCategoryLimit(cat.id, amt);
-                      Navigator.pop(ctx);
-                      HapticUtil.success();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${cat.name} limiti yangilandi'),
-                          backgroundColor: AppColors.primary,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                      try {
+                        await ref.read(budgetProvider.notifier).updateCategoryLimit(cat.id, amt);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        HapticUtil.success();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${cat.name} limiti yangilandi'),
+                              backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text('Xatolik: $e'),
+                              backgroundColor: colors.expense,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
                     }
                   },
                   child: const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),

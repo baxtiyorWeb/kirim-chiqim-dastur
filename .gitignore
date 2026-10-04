@@ -7,9 +7,13 @@
 .atom/
 .build/
 .buildlog/
-.history
-.svn/
-.swiftpm/
+# Environment and Secrets
+.env
+*.env
+backend/.env
+server.exe
+*.exe
+
 migrate_working_dir/
 
 # IntelliJ related

@@ -5,6 +5,7 @@ import 'package:thego_getters/data/models/budget_model.dart';
 import 'package:thego_getters/data/models/category_item.dart';
 import 'package:thego_getters/data/models/debt_item.dart';
 import 'package:thego_getters/data/models/transaction_item.dart';
+import 'package:thego_getters/data/api/api_client.dart';
 import 'package:thego_getters/data/repositories/finance_repository.dart';
 import 'package:thego_getters/data/services/local_storage_service.dart';
 
@@ -40,10 +41,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       storageService = LocalStorageService(prefs);
-      repository = FinanceRepository(storageService);
-      // Start with empty transactions list for clean ledger calculation verification
-      await storageService.saveTransactions([]);
-      await storageService.saveDebts([]);
+      final apiClient = ApiClient(storageService);
+      repository = FinanceRepository(storageService, apiClient);
     });
 
     test('Add expense, add income, and verify ledger balance determinism', () async {
@@ -132,8 +131,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       storageService = LocalStorageService(prefs);
-      repository = FinanceRepository(storageService);
-      await storageService.saveDebts([]);
+      final apiClient = ApiClient(storageService);
+      repository = FinanceRepository(storageService, apiClient);
     });
 
     test('Borrowed debt tracking: Akmal 500,000 so\'m', () async {

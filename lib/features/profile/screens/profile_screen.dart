@@ -30,90 +30,122 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(userProfileProvider.notifier).refresh();
+          await ref.read(dashboardSummaryProvider.notifier).refresh();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
+          child: Column(
           children: [
             const SizedBox(height: AppDimensions.space12),
 
-            // User Info Card
-            Container(
-              padding: const EdgeInsets.all(AppDimensions.space16),
-              decoration: BoxDecoration(
-                color: colors.card,
+            // User Info Card (Clickable to Edit Profile)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticUtil.selection();
+                  context.push('/edit-profile');
+                },
                 borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
-                border: Border.all(color: colors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // Avatar
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: colors.border, width: 2),
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/user_avatar.jpg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: AppColors.primaryLight,
-                          child: const Icon(Icons.person, color: AppColors.primary),
-                        ),
+                child: Container(
+                  padding: const EdgeInsets.all(AppDimensions.space16),
+                  decoration: BoxDecoration(
+                    color: colors.card,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
+                    border: Border.all(color: colors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: context.isDarkMode ? 0.2 : 0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
+                    ],
                   ),
-
-                  const SizedBox(width: AppDimensions.space16),
-
-                  // Name & Plan Badge
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppStrings.userFullName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: colors.textPrimary,
-                          ),
+                  child: Row(
+                    children: [
+                      // Avatar
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colors.border, width: 2),
                         ),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: colors.surfaceVariant,
-                            borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
-                          ),
-                          child: Text(
-                            AppStrings.freePlan,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: colors.textSecondary,
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/images/user_avatar.jpg',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: AppColors.primaryLight,
+                              child: const Icon(Icons.person, color: AppColors.primary),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
 
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: colors.textTertiary,
+                      const SizedBox(width: AppDimensions.space16),
+
+                      // Name & Plan Badge
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (ref.watch(userProfileProvider).fullName.isNotEmpty &&
+                                      ref.watch(userProfileProvider).fullName != 'Foydalanuvchi')
+                                  ? ref.watch(userProfileProvider).fullName
+                                  : (ref.watch(financeRepositoryProvider).currentUserName ??
+                                      AppStrings.userFullName),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: colors.surfaceVariant,
+                                    borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
+                                  ),
+                                  child: Text(
+                                    AppStrings.freePlan,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Tahrirlash',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: colors.textTertiary,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
 
@@ -346,7 +378,11 @@ class ProfileScreen extends ConsumerWidget {
                   );
                   if (confirmed == true && context.mounted) {
                     HapticUtil.medium();
-                    context.go('/onboarding');
+                    final repo = ref.read(financeRepositoryProvider);
+                    await repo.logout();
+                    if (context.mounted) {
+                      context.go('/auth');
+                    }
                   }
                 },
               ),
@@ -356,8 +392,9 @@ class ProfileScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _menuTile({
     required BuildContext context,

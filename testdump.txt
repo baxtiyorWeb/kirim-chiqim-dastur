@@ -1,0 +1,12 @@
+# 1. Neon'dan to'liq dump olish:
+pg_dump "neon_url" --no-owner --no-acl > moliya_backup.sql
+
+# 2. Yangi serverga xatosiz tiklash:
+psql "yangi_server_url" < moliya_backup.sql
+
+
+# Neon dan dump olish:
+pg_dump "sizning_neon_url" --no-owner --no-acl > moliya_backup.sql
+
+# Yangi serverga tiklash:
+psql "yangi_server_url" < moliya_backup.sql

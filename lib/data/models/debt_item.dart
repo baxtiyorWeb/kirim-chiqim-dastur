@@ -142,8 +142,9 @@ class DebtItem {
       'paidAmount': paidAmount,
       'date': date.toIso8601String(),
       'dueDate': dueDate?.toIso8601String(),
-      'status': status.name,
+      'status': status == DebtStatus.partiallyPaid ? 'partially_paid' : status.name,
       'type': type.name,
+      'debtType': type.name,
       'isBorrowed': isBorrowed, // backward compatibility
       'note': note,
       'repayments': repayments.map((r) => r.toJson()).toList(),
@@ -159,8 +160,9 @@ class DebtItem {
     final int parsedPaid = rawPaid is num ? rawPaid.round() : 0;
 
     DebtType parsedType;
-    if (json.containsKey('type') && json['type'] != null) {
-      final typeStr = json['type'].toString().toLowerCase();
+    final rawType = json['type'] ?? json['debtType'];
+    if (rawType != null) {
+      final typeStr = rawType.toString().toLowerCase();
       parsedType = DebtType.values.firstWhere(
         (e) => e.name == typeStr,
         orElse: () => DebtType.borrowed,
@@ -170,13 +172,24 @@ class DebtItem {
       parsedType = isBorrowed ? DebtType.borrowed : DebtType.lent;
     }
 
-    final date = DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now();
+    final rawDateStr = json['date'] ?? json['createdAt'];
+    final date = DateTime.tryParse(rawDateStr?.toString() ?? '') ?? DateTime.now();
 
     List<DebtRepayment> parsedRepayments = [];
     if (json['repayments'] is List) {
       parsedRepayments = (json['repayments'] as List)
           .map((r) => DebtRepayment.fromJson(r as Map<String, dynamic>))
           .toList();
+    }
+
+    final statusStr = json['status']?.toString().toLowerCase();
+    DebtStatus parsedStatus = DebtStatus.active;
+    if (statusStr == 'partially_paid' || statusStr == 'partiallypaid') {
+      parsedStatus = DebtStatus.partiallyPaid;
+    } else if (statusStr == 'returned') {
+      parsedStatus = DebtStatus.returned;
+    } else {
+      parsedStatus = DebtStatus.active;
     }
 
     return DebtItem(
@@ -187,10 +200,7 @@ class DebtItem {
       paidAmount: parsedPaid,
       date: date,
       dueDate: json['dueDate'] != null ? DateTime.tryParse(json['dueDate'].toString()) : null,
-      status: DebtStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-        orElse: () => DebtStatus.active,
-      ),
+      status: parsedStatus,
       type: parsedType,
       note: json['note'] as String?,
       repayments: parsedRepayments,

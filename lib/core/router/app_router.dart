@@ -10,6 +10,8 @@ import '../../features/add_transaction/screens/add_transaction_screen.dart';
 import '../../features/debts/screens/debts_screen.dart';
 import '../../features/budget/screens/budget_screen.dart';
 import '../../features/goals/screens/goals_screen.dart';
+import '../../features/profile/screens/edit_profile_screen.dart';
+import '../../features/auth/screens/auth_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -28,6 +30,17 @@ class AppRouter {
           pageBuilder: (context, state) => CustomTransitionPage(
             key: state.pageKey,
             child: const OnboardingScreen(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
+        ),
+        GoRoute(
+          path: '/auth',
+          parentNavigatorKey: _rootNavigatorKey,
+          pageBuilder: (context, state) => CustomTransitionPage(
+            key: state.pageKey,
+            child: const AuthScreen(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
@@ -144,6 +157,24 @@ class AppRouter {
           pageBuilder: (context, state) => CustomTransitionPage(
             key: state.pageKey,
             child: const GoalsScreen(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              final offsetTween = Tween<Offset>(
+                begin: const Offset(0.06, 0.0),
+                end: Offset.zero,
+              ).chain(CurveTween(curve: Curves.easeOutCubic));
+              return SlideTransition(
+                position: animation.drive(offsetTween),
+                child: FadeTransition(opacity: animation, child: child),
+              );
+            },
+          ),
+        ),
+        GoRoute(
+          path: '/edit-profile',
+          parentNavigatorKey: _rootNavigatorKey,
+          pageBuilder: (context, state) => CustomTransitionPage(
+            key: state.pageKey,
+            child: const EditProfileScreen(),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               final offsetTween = Tween<Offset>(
                 begin: const Offset(0.06, 0.0),

@@ -5,7 +5,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
-import '../../../providers/finance_providers.dart';
 
 class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({super.key});
@@ -118,13 +117,9 @@ class OnboardingScreen extends ConsumerWidget {
                     width: double.infinity,
                     height: AppDimensions.buttonHeight,
                     child: ElevatedButton(
-                      onPressed: () async {
+                      onPressed: () {
                         HapticUtil.light();
-                        final repo = ref.read(financeRepositoryProvider);
-                        await repo.setHasSeenOnboarding(true);
-                        if (context.mounted) {
-                          context.go('/dashboard');
-                        }
+                        context.go('/auth');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
@@ -163,7 +158,7 @@ class OnboardingScreen extends ConsumerWidget {
                     child: TextButton(
                       onPressed: () {
                         HapticUtil.selection();
-                        context.go('/dashboard');
+                        context.go('/auth');
                       },
                       child: Text(
                         AppStrings.signIn,

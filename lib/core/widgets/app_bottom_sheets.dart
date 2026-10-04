@@ -12,7 +12,7 @@ import '../../data/models/debt_item.dart';
 import '../../data/models/transaction_item.dart';
 import '../../providers/finance_providers.dart';
 
-/// Standard modal bottom sheet wrapper adhering to Material 3 design
+/// Standard modal bottom sheet wrapper adhering to Material 3 design and fully responsive to keyboard
 Future<T?> showAppModalBottomSheet<T>({
   required BuildContext context,
   required Widget Function(BuildContext) builder,
@@ -26,42 +26,52 @@ Future<T?> showAppModalBottomSheet<T>({
     enableDrag: enableDrag,
     showDragHandle: false, // We render our own premium animated handle
     backgroundColor: Colors.transparent,
-    builder: (context) {
-      final colors = context.appColors;
-      return Container(
-        decoration: BoxDecoration(
-          color: colors.card,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppDimensions.radiusExtraLarge),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.16),
-              blurRadius: 24,
-              offset: const Offset(0, -6),
+    builder: (sheetContext) {
+      final colors = sheetContext.appColors;
+      final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+      return AnimatedPadding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          decoration: BoxDecoration(
+            color: colors.card,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppDimensions.radiusExtraLarge),
             ),
-          ],
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (showDragHandle) ...[
-                const SizedBox(height: 12),
-                Center(
-                  child: Container(
-                    width: 38,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: colors.border,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              builder(context),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 24,
+                offset: const Offset(0, -6),
+              ),
             ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showDragHandle) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: colors.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  builder(sheetContext),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -755,7 +765,7 @@ void showAddEditTransactionSheet(
                     width: double.infinity,
                     height: AppDimensions.buttonHeight,
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         if (amount <= 0) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -773,43 +783,59 @@ void showAddEditTransactionSheet(
                         final finalTitle = customTitle.isNotEmpty ? customTitle : catName;
                         final note = noteController.text.trim();
 
-                        if (isEditing) {
-                          final updated = existingItem.copyWith(
-                            title: finalTitle,
-                            amount: amount,
-                            categoryId: selectedCategoryId,
-                            type: isExpense ? TransactionType.expense : TransactionType.income,
-                            dateTime: selectedDate,
-                            note: note.isNotEmpty ? note : null,
-                            paymentMethod: paymentMethod,
-                          );
-                          ref.read(transactionsProvider.notifier).updateTransaction(updated);
-                        } else {
-                          final newItem = TransactionItem(
-                            id: const Uuid().v4(),
-                            title: finalTitle,
-                            amount: amount,
-                            categoryId: selectedCategoryId,
-                            type: isExpense ? TransactionType.expense : TransactionType.income,
-                            dateTime: selectedDate,
-                            note: note.isNotEmpty ? note : null,
-                            paymentMethod: paymentMethod,
-                          );
-                          ref.read(transactionsProvider.notifier).addTransaction(newItem);
-                        }
+                        try {
+                          if (isEditing) {
+                            final updated = existingItem.copyWith(
+                              title: finalTitle,
+                              amount: amount,
+                              categoryId: selectedCategoryId,
+                              type: isExpense ? TransactionType.expense : TransactionType.income,
+                              dateTime: selectedDate,
+                              note: note.isNotEmpty ? note : null,
+                              paymentMethod: paymentMethod,
+                            );
+                            await ref.read(transactionsProvider.notifier).updateTransaction(updated);
+                          } else {
+                            final newItem = TransactionItem(
+                              id: const Uuid().v4(),
+                              title: finalTitle,
+                              amount: amount,
+                              categoryId: selectedCategoryId,
+                              type: isExpense ? TransactionType.expense : TransactionType.income,
+                              dateTime: selectedDate,
+                              note: note.isNotEmpty ? note : null,
+                              paymentMethod: paymentMethod,
+                            );
+                            await ref.read(transactionsProvider.notifier).addTransaction(newItem);
+                          }
 
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isEditing
-                                  ? 'Tranzaksiya yangilandi'
-                                  : (isExpense ? 'Xarajat saqlandi' : 'Daromad saqlandi'),
-                            ),
-                            backgroundColor: AppColors.primary,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isEditing
+                                      ? 'Tranzaksiya yangilandi'
+                                      : (isExpense ? 'Xarajat saqlandi' : 'Daromad saqlandi'),
+                                ),
+                                backgroundColor: AppColors.primary,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(
+                                content: Text('Xatolik: $e'),
+                                backgroundColor: colors.expense,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
                       },
                       child: Text(
                         isEditing ? 'Saqlash' : AppStrings.save,
@@ -905,26 +931,42 @@ void showDebtPaymentSheet(BuildContext context, WidgetRef ref, DebtItem debt) {
                   width: double.infinity,
                   height: AppDimensions.buttonHeight,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final amt = CurrencyFormatter.parse(amountController.text);
                       if (amt > 0) {
-                        HapticUtil.success();
-                        ref.read(debtsProvider.notifier).recordPayment(
-                              debtId: debt.id,
-                              amount: amt,
-                              note: noteController.text.trim().isNotEmpty
-                                  ? noteController.text.trim()
-                                  : null,
-                              linkTransaction: linkToTransactions,
+                        try {
+                          await ref.read(debtsProvider.notifier).recordPayment(
+                                debtId: debt.id,
+                                amount: amt,
+                                note: noteController.text.trim().isNotEmpty
+                                    ? noteController.text.trim()
+                                    : null,
+                                linkTransaction: linkToTransactions,
+                              );
+                          HapticUtil.success();
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Qarz to\'lovi muvaffaqiyatli qayd etildi'),
+                                backgroundColor: AppColors.primary,
+                                behavior: SnackBarBehavior.floating,
+                              ),
                             );
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Qarz to\'lovi muvaffaqiyatli qayd etildi'),
-                            backgroundColor: AppColors.primary,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(
+                                content: Text('Xatolik: $e'),
+                                backgroundColor: colors.expense,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        }
                       }
                     },
                     child: const Text('To\'lovni kiritish', style: TextStyle(fontWeight: FontWeight.w700)),

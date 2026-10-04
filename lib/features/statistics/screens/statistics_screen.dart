@@ -28,27 +28,74 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
     final categoryExpenses = ref.watch(categoryExpensesProvider);
     final colors = context.appColors;
 
-    // Dynamically calculate 6 months of historical data
+    // Dynamically calculate period expenses based on selected period
     final now = DateTime.now();
     final List<MonthlyBarData> dynamicMonthlyData = [];
+    int currentPeriodSpent = 0;
+    int previousPeriodSpent = 0;
 
-    for (int i = 5; i >= 0; i--) {
-      final monthDate = DateTime(now.year, now.month - i, 1);
-      final monthSpent = transactions
-          .where((t) =>
-              t.isExpense &&
-              t.dateTime.year == monthDate.year &&
-              t.dateTime.month == monthDate.month)
-          .fold<int>(0, (sum, t) => sum + t.amount);
+    if (_selectedPeriod == 1) {
+      // 1: Haftalik (Oxirgi 7 kun)
+      final weekDays = ['Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan', 'Yak'];
+      for (int i = 6; i >= 0; i--) {
+        final dayDate = now.subtract(Duration(days: i));
+        final daySpent = transactions
+            .where((t) =>
+                t.isExpense &&
+                t.dateTime.year == dayDate.year &&
+                t.dateTime.month == dayDate.month &&
+                t.dateTime.day == dayDate.day)
+            .fold<int>(0, (sum, t) => sum + t.amount);
+        if (i == 0) currentPeriodSpent = daySpent;
+        if (i == 1) previousPeriodSpent = daySpent;
+        dynamicMonthlyData.add(
+          MonthlyBarData(
+            monthLabel: weekDays[(dayDate.weekday - 1) % 7],
+            amount: daySpent,
+            isSelected: i == 0,
+          ),
+        );
+      }
+    } else if (_selectedPeriod == 2) {
+      // 2: Yillik (Oxirgi 3 yil)
+      for (int i = 2; i >= 0; i--) {
+        final year = now.year - i;
+        final yearSpent = transactions
+            .where((t) => t.isExpense && t.dateTime.year == year)
+            .fold<int>(0, (sum, t) => sum + t.amount);
+        if (i == 0) currentPeriodSpent = yearSpent;
+        if (i == 1) previousPeriodSpent = yearSpent;
+        dynamicMonthlyData.add(
+          MonthlyBarData(
+            monthLabel: year.toString(),
+            amount: yearSpent,
+            isSelected: i == 0,
+          ),
+        );
+      }
+    } else {
+      // 0: Oylik (Oxirgi 6 oy)
+      for (int i = 5; i >= 0; i--) {
+        final monthDate = DateTime(now.year, now.month - i, 1);
+        final monthSpent = transactions
+            .where((t) =>
+                t.isExpense &&
+                t.dateTime.year == monthDate.year &&
+                t.dateTime.month == monthDate.month)
+            .fold<int>(0, (sum, t) => sum + t.amount);
 
-      final label = DateFormatter.getMonthShortName(monthDate.month);
-      dynamicMonthlyData.add(
-        MonthlyBarData(
-          monthLabel: label,
-          amount: monthSpent > 0 ? monthSpent : 150000 * (6 - i), // graceful realistic fallback
-          isSelected: i == 0,
-        ),
-      );
+        if (i == 0) currentPeriodSpent = monthSpent;
+        if (i == 1) previousPeriodSpent = monthSpent;
+
+        final label = DateFormatter.getMonthShortName(monthDate.month);
+        dynamicMonthlyData.add(
+          MonthlyBarData(
+            monthLabel: label,
+            amount: monthSpent,
+            isSelected: i == 0,
+          ),
+        );
+      }
     }
 
     // Dynamic Donut data from real category expenses
@@ -71,14 +118,10 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
       }
     }
 
-    // Fallback if no category expenses recorded yet
-    if (donutData.isEmpty) {
-      donutData.addAll([
-        CategoryDonutData(categoryName: 'Ovqatlanish', amount: 520000, percentage: 42, color: AppColors.food),
-        CategoryDonutData(categoryName: 'Transport', amount: 230000, percentage: 18, color: AppColors.transport),
-        CategoryDonutData(categoryName: 'Uy-joy', amount: 400000, percentage: 32, color: AppColors.home),
-        CategoryDonutData(categoryName: 'Boshqa', amount: 100000, percentage: 8, color: AppColors.other),
-      ]);
+    // Real comparison calculation
+    double? diffPercent;
+    if (previousPeriodSpent > 0) {
+      diffPercent = ((currentPeriodSpent - previousPeriodSpent) / previousPeriodSpent) * 100;
     }
 
     return Scaffold(
@@ -93,10 +136,16 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final periodStr = _selectedPeriod == 1 ? 'weekly' : (_selectedPeriod == 2 ? 'yearly' : 'monthly');
+          await ref.read(statisticsProvider.notifier).setPeriod(periodStr);
+          await ref.read(transactionsProvider.notifier).refresh();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: AppDimensions.space12),
@@ -149,7 +198,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                   const SizedBox(height: 6),
 
                   AnimatedCurrencyText(
-                    amount: totalExpenses,
+                    amount: currentPeriodSpent > 0 ? currentPeriodSpent : totalExpenses,
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w800,
@@ -158,26 +207,27 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 4),
-
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.trending_down_rounded,
-                        size: 14,
-                        color: colors.income,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '12% (${AppStrings.comparedToLastMonth})',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: colors.income,
+                  if (diffPercent != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          diffPercent <= 0 ? Icons.trending_down_rounded : Icons.trending_up_rounded,
+                          size: 14,
+                          color: diffPercent <= 0 ? colors.income : colors.expense,
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${diffPercent.abs().toStringAsFixed(1)}% (${AppStrings.comparedToLastMonth})',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: diffPercent <= 0 ? colors.income : colors.expense,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
 
                   const SizedBox(height: AppDimensions.space20),
 
@@ -215,15 +265,46 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
                   ),
                 ],
               ),
-              child: AnimatedDonutChartWidget(data: donutData),
+              child: donutData.isNotEmpty
+                  ? AnimatedDonutChartWidget(data: donutData)
+                  : Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 28.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.pie_chart_outline_rounded, size: 48, color: colors.textTertiary),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Hozircha xarajatlar mavjud emas',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Xarajat qo\'shilgach, bu yerda kategoriyalar diagrammasi ko\'rinadi',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.textTertiary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
             ),
 
             const SizedBox(height: 100),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _periodPill(int index, String title) {
     final colors = context.appColors;
@@ -235,6 +316,8 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
           setState(() {
             _selectedPeriod = index;
           });
+          final periodStr = index == 1 ? 'weekly' : (index == 2 ? 'yearly' : 'monthly');
+          ref.read(statisticsProvider.notifier).setPeriod(periodStr);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),

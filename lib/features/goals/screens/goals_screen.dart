@@ -36,10 +36,14 @@ class GoalsScreen extends ConsumerWidget {
         icon: const Icon(Icons.add_rounded),
         label: const Text('Maqsad qo\'shish', style: TextStyle(fontWeight: FontWeight.w600)),
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(goalsProvider.notifier).refresh();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
+          child: Column(
           children: [
             const SizedBox(height: AppDimensions.space12),
 
@@ -167,12 +171,44 @@ class GoalsScreen extends ConsumerWidget {
                                 color: goal.isCompleted ? colors.income : colors.textSecondary,
                               ),
                             ),
-                            if (!goal.isCompleted)
-                              TextButton.icon(
-                                onPressed: () => _addDepositDialog(context, ref, goal),
-                                icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                                label: const Text('Mablag\' qo\'shish', style: TextStyle(fontSize: 12)),
-                              ),
+                            Row(
+                              children: [
+                                if (!goal.isCompleted) ...[
+                                  TextButton.icon(
+                                    onPressed: () => _addDepositDialog(context, ref, goal),
+                                    icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                                    label: const Text('Mablag\' qo\'shish', style: TextStyle(fontSize: 12)),
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                IconButton(
+                                  icon: Icon(Icons.delete_outline_rounded, size: 18, color: colors.textTertiary),
+                                  tooltip: 'Maqsadni o\'chirish',
+                                  onPressed: () async {
+                                    final confirm = await showConfirmSheet(
+                                      context: context,
+                                      title: 'Maqsadni o\'chirish',
+                                      message: '"${goal.title}" maqsadi butunlay o\'chiriladi. Rozimisiz?',
+                                      confirmLabel: 'O\'chirish',
+                                      isDestructive: true,
+                                      icon: Icons.delete_outline_rounded,
+                                    );
+                                    if (confirm == true) {
+                                      HapticUtil.medium();
+                                      await ref.read(goalsProvider.notifier).deleteGoal(goal.id);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Maqsad o\'chirildi'),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ],
@@ -185,8 +221,9 @@ class GoalsScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _addDepositDialog(BuildContext context, WidgetRef ref, SavingsGoal goal) {
     final controller = TextEditingController();
@@ -196,12 +233,7 @@ class GoalsScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) {
         return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 8,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,19 +261,33 @@ class GoalsScreen extends ConsumerWidget {
                 width: double.infinity,
                 height: AppDimensions.buttonHeight,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final amt = CurrencyFormatter.parse(controller.text);
                     if (amt > 0) {
-                      HapticUtil.success();
-                      ref.read(goalsProvider.notifier).addDeposit(goal.id, amt);
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Jamg\'armaga muvaffaqiyatli qo\'shildi'),
-                          backgroundColor: AppColors.primary,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                      try {
+                        await ref.read(goalsProvider.notifier).addDeposit(goal.id, amt);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        HapticUtil.success();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Jamg\'armaga muvaffaqiyatli qo\'shildi'),
+                              backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text('Xatolik: $e'),
+                              backgroundColor: colors.expense,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
                     }
                   },
                   child: const Text('Qo\'shish', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -263,12 +309,7 @@ class GoalsScreen extends ConsumerWidget {
       context: context,
       builder: (ctx) {
         return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 8,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,11 +338,10 @@ class GoalsScreen extends ConsumerWidget {
                 width: double.infinity,
                 height: AppDimensions.buttonHeight,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final title = titleController.text.trim();
                     final amt = CurrencyFormatter.parse(amountController.text);
                     if (title.isNotEmpty && amt > 0) {
-                      HapticUtil.success();
                       final newGoal = SavingsGoal(
                         id: const Uuid().v4(),
                         title: title,
@@ -309,15 +349,30 @@ class GoalsScreen extends ConsumerWidget {
                         currentAmount: 0,
                         emoji: '🚀',
                       );
-                      ref.read(goalsProvider.notifier).addGoal(newGoal);
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Yangi maqsad yaratildi'),
-                          backgroundColor: AppColors.primary,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                      try {
+                        await ref.read(goalsProvider.notifier).addGoal(newGoal);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        HapticUtil.success();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Yangi maqsad yaratildi'),
+                              backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text('Xatolik: $e'),
+                              backgroundColor: colors.expense,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
                     }
                   },
                   child: const Text('Yaratish', style: TextStyle(fontWeight: FontWeight.w700)),

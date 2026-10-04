@@ -1,56 +1,434 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import '../../core/constants/api_constants.dart';
+import '../api/api_client.dart';
 import '../models/transaction_item.dart';
 import '../models/debt_item.dart';
 import '../models/budget_model.dart';
 import '../models/savings_goal.dart';
+import '../models/dashboard_summary.dart';
+import '../models/statistics_response.dart';
+import '../models/user_profile.dart';
 import '../models/category_item.dart';
 import '../services/local_storage_service.dart';
 
+/// Single source of truth repository connecting Flutter state directly to Go backend and PostgreSQL.
+/// In strict accordance with the Production Architecture:
+/// - NO financial data is persisted locally in SQLite, Hive, or SharedPreferences.
+/// - In-memory state exists solely during the active application session.
+/// - PostgreSQL via REST API is the authoritative source for all business data.
 class FinanceRepository {
   final LocalStorageService _storage;
+  final ApiClient _api;
 
-  FinanceRepository(this._storage);
+  // Active in-memory session caches (NOT persisted locally)
+  List<TransactionItem> _transactions = [];
+  List<DebtItem> _debts = [];
+  BudgetModel _budget = BudgetModel.defaultBudget();
+  List<SavingsGoal> _goals = [];
+  DashboardSummary _dashboardSummary = DashboardSummary.empty();
+  final Map<String, StatisticsResponse> _statisticsCache = {};
+  UserProfile _userProfile = UserProfile.guest();
+  bool _isInitialized = false;
 
-  // Transactions
-  List<TransactionItem> getTransactions() => _storage.getTransactions();
-
-  Future<void> addTransaction(TransactionItem item) async {
-    final list = _storage.getTransactions();
-    list.insert(0, item);
-    await _storage.saveTransactions(list);
+  FinanceRepository(this._storage, [ApiClient? api])
+      : _api = api ?? ApiClient(_storage) {
+    _api.onUnauthorized = () {
+      logout();
+    };
   }
 
-  Future<void> updateTransaction(TransactionItem updatedItem) async {
-    final list = _storage.getTransactions();
-    final index = list.indexWhere((e) => e.id == updatedItem.id);
-    if (index != -1) {
-      list[index] = updatedItem.copyWith(updatedAt: DateTime.now());
-      await _storage.saveTransactions(list);
+  ApiClient get api => _api;
+  LocalStorageService get storage => _storage;
+  bool get isInitialized => _isInitialized;
+
+  // -------------------------------------------------------------
+  // AUTHENTICATION & USER MANAGEMENT
+  // -------------------------------------------------------------
+
+  bool get isAuthenticated => _storage.isAuthenticated;
+  String? get currentUserId => _storage.getUserId();
+  String? get currentUserEmail => _userProfile.email ?? _storage.getUserEmail();
+  String? get currentUserName => _userProfile.fullName.isNotEmpty && _userProfile.fullName != 'Foydalanuvchi'
+      ? _userProfile.fullName
+      : _storage.getUserName() ?? 'Foydalanuvchi';
+  String? get currentUserPhone => _userProfile.phoneNumber ?? _storage.getUserPhone();
+  UserProfile get userProfile => _userProfile;
+
+  Future<Map<String, dynamic>> sendOtp(String phoneNumber) async {
+    final response = await _api.post(ApiConstants.authSendOtp, body: {
+      'phoneNumber': phoneNumber,
+    });
+    if (response is Map) {
+      return Map<String, dynamic>.from(response);
+    }
+    return {'success': true};
+  }
+
+  Future<Map<String, dynamic>> verifyOtp(String phoneNumber, String code) async {
+    final response = await _api.post(ApiConstants.authVerifyOtp, body: {
+      'phoneNumber': phoneNumber,
+      'code': code,
+    });
+
+    if (response is Map) {
+      final resMap = Map<String, dynamic>.from(response);
+      final isNewUser = resMap['isNewUser'] == true;
+      if (!isNewUser) {
+        final token = resMap['token']?.toString();
+        final user = resMap['user'] as Map<String, dynamic>?;
+        if (token != null) {
+          await _storage.saveAuthToken(token);
+        }
+        if (user != null) {
+          _userProfile = UserProfile.fromJson(user);
+          await _storage.saveUserProfile(
+            userId: _userProfile.id,
+            email: _userProfile.email,
+            fullName: _userProfile.fullName,
+            phoneNumber: _userProfile.phoneNumber ?? phoneNumber,
+          );
+        }
+        await syncAllWithBackend();
+      }
+      return resMap;
+    }
+    return {'isNewUser': false};
+  }
+
+  Future<void> completeRegistration(String phoneNumber, String fullName) async {
+    final response = await _api.post(ApiConstants.authCompleteRegistration, body: {
+      'phoneNumber': phoneNumber,
+      'fullName': fullName,
+    });
+
+    if (response is Map) {
+      final token = response['token']?.toString();
+      final user = response['user'] as Map<String, dynamic>?;
+      if (token != null) {
+        await _storage.saveAuthToken(token);
+      }
+      if (user != null) {
+        _userProfile = UserProfile.fromJson(user);
+        await _storage.saveUserProfile(
+          userId: _userProfile.id,
+          email: _userProfile.email,
+          fullName: _userProfile.fullName,
+          phoneNumber: _userProfile.phoneNumber ?? phoneNumber,
+        );
+      }
+      await syncAllWithBackend();
     }
   }
 
-  Future<void> deleteTransaction(String id) async {
-    final list = _storage.getTransactions();
-    list.removeWhere((e) => e.id == id);
-    await _storage.saveTransactions(list);
+  Future<void> login(String email, String password) async {
+    final response = await _api.post(ApiConstants.authLogin, body: {
+      'email': email,
+      'password': password,
+    });
+
+    if (response is Map) {
+      final token = response['token']?.toString();
+      final user = response['user'] as Map<String, dynamic>?;
+      if (token != null) {
+        await _storage.saveAuthToken(token);
+      }
+      if (user != null) {
+        _userProfile = UserProfile.fromJson(user);
+        await _storage.saveUserProfile(
+          userId: _userProfile.id,
+          email: _userProfile.email,
+          fullName: _userProfile.fullName,
+          phoneNumber: _userProfile.phoneNumber,
+        );
+      }
+      await syncAllWithBackend();
+    }
   }
 
-  // Debts
-  List<DebtItem> getDebts() => _storage.getDebts();
+  Future<void> register(String email, String password, String fullName) async {
+    final response = await _api.post(ApiConstants.authRegister, body: {
+      'email': email,
+      'password': password,
+      'fullName': fullName,
+    });
 
-  Future<void> addDebt(DebtItem debt) async {
-    final list = _storage.getDebts();
-    list.insert(0, debt);
-    await _storage.saveDebts(list);
+    if (response is Map) {
+      final token = response['token']?.toString();
+      final user = response['user'] as Map<String, dynamic>?;
+      if (token != null) {
+        await _storage.saveAuthToken(token);
+      }
+      if (user != null) {
+        _userProfile = UserProfile.fromJson(user);
+        await _storage.saveUserProfile(
+          userId: _userProfile.id,
+          email: _userProfile.email,
+          fullName: _userProfile.fullName,
+          phoneNumber: _userProfile.phoneNumber,
+        );
+      }
+      await syncAllWithBackend();
+    }
+  }
+
+  Future<void> logout() async {
+    await _storage.clearAllData();
+    _transactions = [];
+    _debts = [];
+    _budget = BudgetModel.defaultBudget();
+    _goals = [];
+    _dashboardSummary = DashboardSummary.empty();
+    _statisticsCache.clear();
+    _userProfile = UserProfile.guest();
+    _isInitialized = false;
+  }
+
+  Future<UserProfile> fetchProfile() async {
+    if (!isAuthenticated) return _userProfile;
+    try {
+      final res = await _api.get(ApiConstants.authMe);
+      if (res is Map<String, dynamic>) {
+        _userProfile = UserProfile.fromJson(res);
+        await _storage.saveUserProfile(
+          userId: _userProfile.id,
+          email: _userProfile.email,
+          fullName: _userProfile.fullName,
+          phoneNumber: _userProfile.phoneNumber,
+        );
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchProfile notice: $e');
+    }
+    return _userProfile;
+  }
+
+  Future<UserProfile> updateProfile({
+    required String fullName,
+    String? email,
+    String? avatarUrl,
+  }) async {
+    final res = await _api.put(ApiConstants.authProfile, body: {
+      'fullName': fullName,
+      'email': email,
+      'avatarUrl': avatarUrl,
+    });
+
+    if (res is Map<String, dynamic>) {
+      _userProfile = UserProfile.fromJson(res);
+      await _storage.saveUserProfile(
+        userId: _userProfile.id,
+        email: _userProfile.email,
+        fullName: _userProfile.fullName,
+        phoneNumber: _userProfile.phoneNumber,
+      );
+    }
+    return _userProfile;
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      await _api.delete(ApiConstants.authDeleteAccount);
+    } catch (_) {}
+    await logout();
+  }
+
+  // -------------------------------------------------------------
+  // FULL REAL DATA SYNCHRONIZATION WITH POSTGRESQL
+  // -------------------------------------------------------------
+
+  Future<void> syncAllWithBackend() async {
+    if (!isAuthenticated) return;
+
+    try {
+      final results = await Future.wait([
+        _api.get(ApiConstants.dashboard),
+        _api.get(ApiConstants.transactions),
+        _api.get(ApiConstants.budget),
+        _api.get(ApiConstants.debts),
+        _api.get(ApiConstants.goals),
+        _api.get(ApiConstants.authMe),
+      ]);
+
+      // 1. Dashboard summary
+      if (results[0] is Map<String, dynamic>) {
+        _dashboardSummary = DashboardSummary.fromJson(results[0] as Map<String, dynamic>);
+      }
+
+      // 2. Transactions
+      if (results[1] is List) {
+        _transactions = (results[1] as List)
+            .map((e) => TransactionItem.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+
+      // 3. Budget
+      if (results[2] is Map<String, dynamic>) {
+        _budget = BudgetModel.fromJson(results[2] as Map<String, dynamic>);
+      }
+
+      // 4. Debts
+      if (results[3] is List) {
+        _debts = (results[3] as List)
+            .map((e) => DebtItem.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+
+      // 5. Goals
+      if (results[4] is List) {
+        _goals = (results[4] as List)
+            .map((e) => SavingsGoal.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+
+      // 6. Profile
+      if (results[5] is Map<String, dynamic>) {
+        _userProfile = UserProfile.fromJson(results[5] as Map<String, dynamic>);
+      }
+
+      _isInitialized = true;
+    } catch (e) {
+      debugPrint('[FinanceRepository] syncAllWithBackend warning: $e');
+    }
+  }
+
+  // -------------------------------------------------------------
+  // DASHBOARD
+  // -------------------------------------------------------------
+
+  DashboardSummary getDashboardSummary() => _dashboardSummary;
+
+  Future<DashboardSummary> fetchDashboard() async {
+    if (!isAuthenticated) return _dashboardSummary;
+    try {
+      final res = await _api.get(ApiConstants.dashboard);
+      if (res is Map<String, dynamic>) {
+        _dashboardSummary = DashboardSummary.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchDashboard error: $e');
+    }
+    return _dashboardSummary;
+  }
+
+  // -------------------------------------------------------------
+  // TRANSACTIONS
+  // -------------------------------------------------------------
+
+  List<TransactionItem> getTransactions() => List.unmodifiable(_transactions);
+
+  Future<List<TransactionItem>> fetchTransactions({
+    String? type,
+    String? categoryId,
+    DateTime? startDate,
+    DateTime? endDate,
+    int? limit,
+    int? offset,
+  }) async {
+    if (!isAuthenticated) return _transactions;
+
+    final query = <String, dynamic>{};
+    if (type != null && type != 'all') query['type'] = type;
+    if (categoryId != null && categoryId != 'all') query['categoryId'] = categoryId;
+    if (startDate != null) query['startDate'] = startDate.toIso8601String();
+    if (endDate != null) query['endDate'] = endDate.toIso8601String();
+    if (limit != null) query['limit'] = limit;
+    if (offset != null) query['offset'] = offset;
+
+    try {
+      final res = await _api.get(ApiConstants.transactions, queryParams: query);
+      if (res is List) {
+        final list = res.map((e) => TransactionItem.fromJson(e as Map<String, dynamic>)).toList();
+        if (offset == null || offset == 0) {
+          _transactions = list;
+        } else {
+          // Append for pagination without duplicates
+          final existingIds = _transactions.map((t) => t.id).toSet();
+          for (final t in list) {
+            if (!existingIds.contains(t.id)) {
+              _transactions.add(t);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchTransactions error: $e');
+    }
+    return _transactions;
+  }
+
+  Future<TransactionItem> addTransaction(TransactionItem item) async {
+    if (isAuthenticated) {
+      final res = await _api.post(ApiConstants.transactions, body: item.toJson());
+      if (res is Map<String, dynamic>) {
+        final serverItem = TransactionItem.fromJson(res);
+        _transactions.insert(0, serverItem);
+        // Silently update dashboard in background
+        fetchDashboard();
+        return serverItem;
+      }
+    }
+    _transactions.insert(0, item);
+    return item;
+  }
+
+  Future<void> updateTransaction(TransactionItem updatedItem) async {
+    if (isAuthenticated) {
+      await _api.put('${ApiConstants.transactions}/${updatedItem.id}', body: updatedItem.toJson());
+    }
+    final index = _transactions.indexWhere((e) => e.id == updatedItem.id);
+    if (index != -1) {
+      _transactions[index] = updatedItem.copyWith(updatedAt: DateTime.now());
+    }
+    fetchDashboard();
+  }
+
+  Future<void> deleteTransaction(String id) async {
+    if (isAuthenticated) {
+      await _api.delete('${ApiConstants.transactions}/$id');
+    }
+    _transactions.removeWhere((e) => e.id == id);
+    fetchDashboard();
+  }
+
+  // -------------------------------------------------------------
+  // DEBTS
+  // -------------------------------------------------------------
+
+  List<DebtItem> getDebts() => List.unmodifiable(_debts);
+
+  Future<List<DebtItem>> fetchDebts() async {
+    if (!isAuthenticated) return _debts;
+    try {
+      final res = await _api.get(ApiConstants.debts);
+      if (res is List) {
+        _debts = res.map((e) => DebtItem.fromJson(e as Map<String, dynamic>)).toList();
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchDebts error: $e');
+    }
+    return _debts;
+  }
+
+  Future<DebtItem> addDebt(DebtItem debt) async {
+    if (isAuthenticated) {
+      final res = await _api.post(ApiConstants.debts, body: debt.toJson());
+      if (res is Map<String, dynamic>) {
+        final serverDebt = DebtItem.fromJson(res);
+        _debts.insert(0, serverDebt);
+        return serverDebt;
+      }
+    }
+    _debts.insert(0, debt);
+    return debt;
   }
 
   Future<void> updateDebt(DebtItem updatedDebt) async {
-    final list = _storage.getDebts();
-    final index = list.indexWhere((d) => d.id == updatedDebt.id);
+    if (isAuthenticated) {
+      await _api.put('${ApiConstants.debts}/${updatedDebt.id}', body: updatedDebt.toJson());
+    }
+    final index = _debts.indexWhere((d) => d.id == updatedDebt.id);
     if (index != -1) {
-      list[index] = updatedDebt.copyWith(updatedAt: DateTime.now());
-      await _storage.saveDebts(list);
+      _debts[index] = updatedDebt.copyWith(updatedAt: DateTime.now());
     }
   }
 
@@ -60,123 +438,214 @@ class FinanceRepository {
     String? note,
     bool linkTransaction = false,
   }) async {
-    final list = _storage.getDebts();
-    final index = list.indexWhere((d) => d.id == debtId);
-    if (index == -1) return;
+    if (isAuthenticated) {
+      await _api.post('${ApiConstants.debts}/$debtId/repay', body: {
+        'amount': paymentAmount,
+        'note': note ?? '',
+      });
+      // Re-fetch fresh debts state from PostgreSQL
+      await fetchDebts();
+    } else {
+      final index = _debts.indexWhere((d) => d.id == debtId);
+      if (index != -1) {
+        final debt = _debts[index];
+        final newPaid = (debt.paidAmount + paymentAmount).clamp(0, debt.amount);
+        final newStatus = newPaid >= debt.amount ? DebtStatus.returned : DebtStatus.partiallyPaid;
+        final newRepayments = List<DebtRepayment>.from(debt.repayments)
+          ..add(DebtRepayment(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            debtId: debtId,
+            amount: paymentAmount,
+            date: DateTime.now(),
+            note: note,
+          ));
+        _debts[index] = debt.copyWith(
+          paidAmount: newPaid,
+          status: newStatus,
+          repayments: newRepayments,
+        );
+      }
+    }
 
-    final debt = list[index];
-    final newPaid = (debt.paidAmount + paymentAmount).clamp(0, debt.amount);
-    final newStatus = newPaid >= debt.amount ? DebtStatus.returned : DebtStatus.partiallyPaid;
-
-    final repayment = DebtRepayment(
-      id: const Uuid().v4(),
-      debtId: debtId,
-      amount: paymentAmount,
-      date: DateTime.now(),
-      note: note,
-    );
-
-    final updatedRepayments = List<DebtRepayment>.from(debt.repayments)..add(repayment);
-
-    final updatedDebt = debt.copyWith(
-      paidAmount: newPaid,
-      status: newStatus,
-      repayments: updatedRepayments,
-      updatedAt: DateTime.now(),
-    );
-
-    list[index] = updatedDebt;
-    await _storage.saveDebts(list);
-
-    // Optionally create an expense/income transaction if user wants ledger reflection
     if (linkTransaction) {
-      final isExpense = debt.isBorrowed; // If I pay back what I borrowed, it's an expense; if they pay me back, it's income
+      final debtItem = _debts.firstWhere((d) => d.id == debtId);
+      final isExpense = debtItem.isBorrowed;
       final tx = TransactionItem(
-        id: const Uuid().v4(),
-        title: debt.isBorrowed
-            ? '${debt.personName} ga qarz qaytarildi'
-            : '${debt.personName} dan qarz qaytarildi',
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: debtItem.isBorrowed
+            ? '${debtItem.personName} ga qarz qaytarildi'
+            : '${debtItem.personName} dan qarz qaytarildi',
         amount: paymentAmount,
-        categoryId: debt.isBorrowed ? 'other' : 'other_income',
+        categoryId: debtItem.isBorrowed ? 'other' : 'other_income',
         type: isExpense ? TransactionType.expense : TransactionType.income,
         dateTime: DateTime.now(),
         note: note ?? 'Qarz to\'lovi',
         debtId: debtId,
-        personName: debt.personName,
+        personName: debtItem.personName,
       );
       await addTransaction(tx);
     }
   }
 
   Future<void> markDebtReturned(String debtId) async {
-    final list = _storage.getDebts();
-    final index = list.indexWhere((d) => d.id == debtId);
-    if (index != -1) {
-      final debt = list[index];
-      final remaining = debt.remainingAmount;
-      if (remaining > 0) {
-        await recordDebtPayment(
-          debtId: debtId,
-          paymentAmount: remaining,
-          note: 'To\'liq yopildi',
-        );
-      }
+    final debt = _debts.firstWhere((d) => d.id == debtId);
+    final remaining = debt.remainingAmount;
+    if (remaining > 0) {
+      await recordDebtPayment(
+        debtId: debtId,
+        paymentAmount: remaining,
+        note: 'To\'liq qaytarildi',
+      );
     }
   }
 
   Future<void> deleteDebt(String id) async {
-    final list = _storage.getDebts();
-    list.removeWhere((d) => d.id == id);
-    await _storage.saveDebts(list);
+    if (isAuthenticated) {
+      await _api.delete('${ApiConstants.debts}/$id');
+    }
+    _debts.removeWhere((d) => d.id == id);
   }
 
-  // Budget
-  BudgetModel getBudget() => _storage.getBudget();
+  // -------------------------------------------------------------
+  // BUDGET & SMETA
+  // -------------------------------------------------------------
+
+  BudgetModel getBudget() => _budget;
+
+  Future<BudgetModel> fetchBudget([String? yearMonth]) async {
+    if (!isAuthenticated) return _budget;
+    try {
+      final query = yearMonth != null ? {'yearMonth': yearMonth} : null;
+      final res = await _api.get(ApiConstants.budget, queryParams: query);
+      if (res is Map<String, dynamic>) {
+        _budget = BudgetModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchBudget error: $e');
+    }
+    return _budget;
+  }
 
   Future<void> saveBudget(BudgetModel budget) async {
-    await _storage.saveBudget(budget);
+    _budget = budget;
+    if (isAuthenticated) {
+      await _api.put(ApiConstants.budget, body: {
+        'totalMonthlyLimit': budget.totalMonthlyBudget,
+      });
+    }
   }
 
-  // Goals
-  List<SavingsGoal> getGoals() => _storage.getGoals();
+  Future<void> setCategoryLimit(String categoryId, int limitAmount) async {
+    final updatedLimits = Map<String, int>.from(_budget.categoryLimits);
+    updatedLimits[categoryId] = limitAmount;
+    _budget = _budget.copyWith(categoryLimits: updatedLimits);
 
-  Future<void> addGoal(SavingsGoal goal) async {
-    final list = _storage.getGoals();
-    list.add(goal);
-    await _storage.saveGoals(list);
+    if (isAuthenticated) {
+      await _api.put('${ApiConstants.budgetCategoryLimit}/$categoryId', body: {
+        'categoryId': categoryId,
+        'limitAmount': limitAmount,
+      });
+    }
   }
 
-  Future<void> updateGoal(SavingsGoal updated) async {
-    final list = _storage.getGoals();
-    final index = list.indexWhere((g) => g.id == updated.id);
-    if (index != -1) {
-      list[index] = updated;
-      await _storage.saveGoals(list);
+  // -------------------------------------------------------------
+  // SAVINGS GOALS
+  // -------------------------------------------------------------
+
+  List<SavingsGoal> getGoals() => List.unmodifiable(_goals);
+
+  Future<List<SavingsGoal>> fetchGoals() async {
+    if (!isAuthenticated) return _goals;
+    try {
+      final res = await _api.get(ApiConstants.goals);
+      if (res is List) {
+        _goals = res.map((e) => SavingsGoal.fromJson(e as Map<String, dynamic>)).toList();
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchGoals error: $e');
+    }
+    return _goals;
+  }
+
+  Future<SavingsGoal> addGoal(SavingsGoal goal) async {
+    if (isAuthenticated) {
+      final res = await _api.post(ApiConstants.goals, body: goal.toJson());
+      if (res is Map<String, dynamic>) {
+        final serverGoal = SavingsGoal.fromJson(res);
+        _goals.add(serverGoal);
+        return serverGoal;
+      }
+    }
+    _goals.add(goal);
+    return goal;
+  }
+
+  Future<void> addGoalDeposit(String goalId, int amount) async {
+    if (isAuthenticated) {
+      await _api.post('${ApiConstants.goals}/$goalId/deposit', body: {'amount': amount});
+      await fetchGoals();
+    } else {
+      final index = _goals.indexWhere((g) => g.id == goalId);
+      if (index != -1) {
+        final goal = _goals[index];
+        _goals[index] = goal.copyWith(currentAmount: goal.currentAmount + amount);
+      }
     }
   }
 
   Future<void> deleteGoal(String id) async {
-    final list = _storage.getGoals();
-    list.removeWhere((g) => g.id == id);
-    await _storage.saveGoals(list);
+    if (isAuthenticated) {
+      await _api.delete('${ApiConstants.goals}/$id');
+    }
+    _goals.removeWhere((g) => g.id == id);
   }
 
-  // Initial Opening Balance
-  int getInitialBalance() => _storage.initialBalance;
-  Future<void> setInitialBalance(int balance) => _storage.setInitialBalance(balance);
+  // -------------------------------------------------------------
+  // STATISTICS
+  // -------------------------------------------------------------
 
-  // Theme Mode
+  Future<StatisticsResponse> fetchStatistics(String period) async {
+    if (_statisticsCache.containsKey(period)) {
+      // Background revalidation
+      _api.get(ApiConstants.statistics, queryParams: {'period': period}).then((res) {
+        if (res is Map<String, dynamic>) {
+          _statisticsCache[period] = StatisticsResponse.fromJson(res);
+        }
+      }).catchError((_) {});
+      return _statisticsCache[period]!;
+    }
+
+    if (!isAuthenticated) {
+      return StatisticsResponse.empty(period);
+    }
+
+    try {
+      final res = await _api.get(ApiConstants.statistics, queryParams: {'period': period});
+      if (res is Map<String, dynamic>) {
+        final stats = StatisticsResponse.fromJson(res);
+        _statisticsCache[period] = stats;
+        return stats;
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchStatistics error: $e');
+    }
+    return StatisticsResponse.empty(period);
+  }
+
+  // -------------------------------------------------------------
+  // APP PREFERENCES
+  // -------------------------------------------------------------
+
   ThemeMode getThemeMode() => _storage.themeMode;
   Future<void> setThemeMode(ThemeMode mode) => _storage.setThemeMode(mode);
 
-  // Onboarding
   bool hasSeenOnboarding() => _storage.hasSeenOnboarding;
   Future<void> setHasSeenOnboarding(bool seen) => _storage.setHasSeenOnboarding(seen);
 
-  // Reset / Clear Data
-  Future<void> clearAllData() => _storage.clearAllData();
+  // -------------------------------------------------------------
+  // EXPORT TO CSV
+  // -------------------------------------------------------------
 
-  // Export Data to CSV
   String generateCsvReport({
     DateTime? startDate,
     DateTime? endDate,
@@ -190,7 +659,7 @@ class FinanceRepository {
       buffer.writeln('--- TRANZAKSIYALAR HISOBOTI ---');
       buffer.writeln('ID,Sana,Kategoriya,Turi,Summa (so\'m),Nomi,Izoh,To\'lov usuli');
 
-      final txList = getTransactions().where((t) {
+      final txList = _transactions.where((t) {
         if (startDate != null && t.dateTime.isBefore(startDate)) return false;
         if (endDate != null && t.dateTime.isAfter(endDate)) return false;
         if (!includeExpenses && t.isExpense) return false;
@@ -213,8 +682,7 @@ class FinanceRepository {
       buffer.writeln('--- QARZ DAFTARI HISOBOTI ---');
       buffer.writeln('ID,Shaxs,Telefon,Turi,Umumiy summa (so\'m),To\'langan (so\'m),Qolgan summa (so\'m),Holat,Sana,Izoh');
 
-      final debtList = getDebts();
-      for (final d in debtList) {
+      for (final d in _debts) {
         final type = d.isBorrowed ? 'Olingan qarz' : 'Berilgan qarz';
         final date = '${d.date.year}-${d.date.month.toString().padLeft(2, '0')}-${d.date.day.toString().padLeft(2, '0')}';
         final cleanNote = (d.note ?? '').replaceAll(',', ' ');
@@ -223,5 +691,19 @@ class FinanceRepository {
     }
 
     return buffer.toString();
+  }
+
+  int getInitialBalance() => _storage.getInitialBalance();
+  Future<void> setInitialBalance(int amount) => _storage.saveInitialBalance(amount);
+
+  Future<void> clearAllData() async {
+    await _storage.clearAllData();
+    _transactions = [];
+    _debts = [];
+    _budget = BudgetModel.defaultBudget();
+    _goals = [];
+    _dashboardSummary = DashboardSummary.empty();
+    _statisticsCache.clear();
+    _userProfile = UserProfile.guest();
   }
 }
