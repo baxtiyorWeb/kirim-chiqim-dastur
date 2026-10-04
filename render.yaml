@@ -1,0 +1,36 @@
+# ==============================================================================
+# Kirim-Chiqim (Moliya) Backend - Render Blueprint Specification (2026)
+# Documentation: https://render.com/docs/blueprint-spec
+# ==============================================================================
+version: "1"
+
+services:
+  - type: web
+    name: kirim-chiqim-backend
+    runtime: go
+    plan: free # 'free' yoki 'starter'
+    region: frankfurt # Frankfurt (eu-central-1) - O'zbekiston uchun eng past ping (~60-80ms)
+    rootDir: backend
+    buildCommand: go build -v -ldflags="-w -s" -o server cmd/server/main.go
+    startCommand: ./server
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+
+      - key: PORT
+        value: 10000
+
+      # Neon PostgreSQL yoki tashqi PostgreSQL ulanish manzili
+      # Render dashboardda kiritiladi: postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+
+      # Xavfsiz 256-bitli JWT kalit (Render avtomatik tarzda xavfsiz generatsiya qiladi)
+      - key: JWT_SECRET
+        generateValue: true
+
+      # Ruxsat etilgan CORS domenlari (* barcha domenlarga ruxsat beradi)
+      - key: CORS_ORIGINS
+        value: "*"

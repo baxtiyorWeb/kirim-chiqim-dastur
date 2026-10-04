@@ -24,7 +24,7 @@ WORKDIR /app
 
 # Copy binary and database migrations
 COPY --from=builder /app/server /app/server
-COPY --from=builder /app/../database /app/database
+COPY --from=builder /app/database /app/database
 
 # Default configuration
 ENV PORT=8080

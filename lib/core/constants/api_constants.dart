@@ -8,6 +8,10 @@ class ApiConstants {
   static const String _defaultPort = '8080';
 
   static String get defaultBaseUrl {
+    const fromEnv = String.fromEnvironment('API_BASE_URL');
+    if (fromEnv.isNotEmpty) {
+      return fromEnv;
+    }
     if (kIsWeb) {
       return 'http://localhost:$_defaultPort';
     }
