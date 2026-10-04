@@ -384,55 +384,6 @@ class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
                 ),
               ),
 
-              const SizedBox(height: AppDimensions.space12),
-
-              // PRO tafsilot havolasi
-              InkWell(
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/pricing');
-                },
-                borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'PRO',
-                          style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Keyingi 30 kunlik batafsil tahlilni ko\'rish',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: colors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 11,
-                        color: colors.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
               const SizedBox(height: AppDimensions.space16),
             ] else ...[
               // Bo'sh holatdagi tushunarli yo'riqnoma

@@ -56,16 +56,8 @@ final financialIntelligenceProvider = Provider<FinancialHealthState>((ref) {
   // 2. Goals allocation (maqsadlar uchun ajratilgan mablag')
   final totalGoalsAllocated =
       goals.fold<int>(0, (sum, g) => sum + g.currentAmount);
-  final activeGoalReserve = goals.isNotEmpty
-      ? (totalGoalsAllocated > 0
-          ? min(balance ~/ 5, totalGoalsAllocated)
-          : min(balance ~/ 10, 300000))
-      : 0;
 
-  // 3. Safety buffer (Xavfsizlik zaxirasi)
-  const int safetyBuffer = 500000;
-
-  // 4. Monthly budget & remaining
+  // 3. Monthly budget & remaining
   final monthlyLimit = dashboard.totalMonthlyLimit > 0
       ? dashboard.totalMonthlyLimit
       : budget.totalMonthlyBudget;
@@ -74,20 +66,56 @@ final financialIntelligenceProvider = Provider<FinancialHealthState>((ref) {
       : dashboard.totalExpense;
   final remainingBudget = max(0, monthlyLimit - monthExpense);
 
-  // 5. Spendable cash (sarflash mumkin bo'lgan erkin mablag')
-  // Transparent formula: balance - upcomingDebts - goalReserve - safetyBuffer
-  int spendableCash = balance - totalBorrowedDue - activeGoalReserve - safetyBuffer;
-  if (spendableCash <= 0 && balance > totalBorrowedDue) {
-    // If safety buffer cannot be fully maintained, cautious remaining portion
-    spendableCash = max(0, balance - totalBorrowedDue);
-  } else if (spendableCash < 0) {
-    spendableCash = 0;
+  // 4. Operatsion pul fondi (Oylik byudjet va joriy naqd mablag' uyg'unligi)
+  int operationalPool;
+  if (monthlyLimit > 0 && remainingBudget > 0) {
+    operationalPool = min(balance, remainingBudget);
+  } else {
+    operationalPool = balance;
+  }
+  if (operationalPool < 0) operationalPool = 0;
+
+  // 5. Qarzlar uchun oylik zaxira (Soft debt reserve)
+  // Butun qarz summasi bir kunda yechib tashlanmaydi! Kundalik yashash xarajati 0 bo'lib qolmasligi uchun
+  // balansdan oqilona 15-20% qismi qarz to'lovlariga mo'ljallanadi.
+  int debtMonthlyReserve = 0;
+  if (totalBorrowedDue > 0 && operationalPool > 0) {
+    debtMonthlyReserve = min((operationalPool * 0.2).round(), totalBorrowedDue);
   }
 
-  // 6. Safe daily calculation: spendableCash / daysRemaining
-  final int safeDaily = max(0, (spendableCash / daysRemaining).floor());
+  // 6. Maqsadlar uchun zaxira
+  int goalReserve = 0;
+  if (totalGoalsAllocated > 0 && operationalPool > 0) {
+    goalReserve = min((operationalPool * 0.1).round(), totalGoalsAllocated);
+  }
 
-  // 7. Burn rate & Runway calculation
+  // 7. Xavfsizlik ehtiyot zaxirasi
+  int dynamicBuffer = 0;
+  if (operationalPool >= 2000000) {
+    dynamicBuffer = min(500000, (operationalPool * 0.08).round());
+  } else if (operationalPool >= 500000) {
+    dynamicBuffer = (operationalPool * 0.05).round();
+  }
+
+  // 8. Kundalik sarf uchun erkin mablag' (Spendable cash)
+  int spendableCash = operationalPool - debtMonthlyReserve - goalReserve - dynamicBuffer;
+  if (spendableCash < (operationalPool * 0.6).round()) {
+    spendableCash = (operationalPool * 0.75).round();
+  }
+  if (spendableCash <= 0 && balance > 0) {
+    spendableCash = (balance * 0.8).round();
+  }
+  if (spendableCash < 0) {
+    spendableCash = max(0, operationalPool);
+  }
+
+  // 9. Kunlik me'yor (Safe daily)
+  int safeDaily = (spendableCash / daysRemaining).floor();
+  if (safeDaily == 0 && balance > 0) {
+    safeDaily = (balance / daysRemaining).floor();
+  }
+
+  // 10. Burn rate & Runway calculation
   final int dailyBurnRate = (monthExpense > 0 && now.day > 0)
       ? (monthExpense / now.day).round()
       : (balance > 0 ? (balance / 30.0).round() : 1);
@@ -96,18 +124,18 @@ final financialIntelligenceProvider = Provider<FinancialHealthState>((ref) {
       ? (balance / dailyBurnRate).floor()
       : 99;
 
-  // 8. Overall risk level
+  // 11. Overall risk level
   final FinancialRiskLevel overallRisk;
   if (balance < 0 || (monthlyLimit > 0 && monthExpense > monthlyLimit)) {
     overallRisk = FinancialRiskLevel.danger;
-  } else if (balance < safetyBuffer ||
+  } else if (balance < dynamicBuffer ||
       (monthlyLimit > 0 && (monthExpense / monthlyLimit) > 0.85)) {
     overallRisk = FinancialRiskLevel.caution;
   } else {
     overallRisk = FinancialRiskLevel.safe;
   }
 
-  // 9. Radar alerts generation
+  // 12. Radar alerts generation
   final alerts = <RadarAlert>[];
 
   // A. Cashflow Alert
@@ -172,9 +200,9 @@ final financialIntelligenceProvider = Provider<FinancialHealthState>((ref) {
     alerts.add(
       RadarAlert(
         id: 'debt_borrowed_alert',
-        title: '🟡 Qarz majburiyati',
+        title: '🟡 Qarz majburiyati mavjud',
         description:
-            'To‘lanishi kerak bo‘lgan jami qarz: ${CurrencyFormatter.format(totalBorrowedDue)}',
+            'To‘lanishi kerak bo‘lgan qarz: ${CurrencyFormatter.format(totalBorrowedDue)}. Oylik rejangizda to‘lovlarni inobatga oling.',
         type: RadarAlertType.warning,
         actionLabel: 'Qarzlar',
         actionRoute: '/debts',
@@ -211,8 +239,9 @@ final financialIntelligenceProvider = Provider<FinancialHealthState>((ref) {
   return FinancialHealthState(
     balance: balance,
     upcomingDebts: totalBorrowedDue,
-    goalsAllocation: activeGoalReserve,
-    safetyBuffer: safetyBuffer,
+    debtMonthlyReserve: debtMonthlyReserve,
+    goalsAllocation: goalReserve,
+    safetyBuffer: dynamicBuffer,
     spendableAmount: spendableCash,
     safeToSpendToday: safeDaily,
     monthlyRemainingBudget: remainingBudget,

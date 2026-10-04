@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../../utils/currency_formatter.dart';
 
 enum FinancialRiskLevel {
   safe, // Yashil: Barqaror
@@ -74,6 +75,7 @@ class WhatIfResult {
 class FinancialHealthState {
   final int balance;
   final int upcomingDebts; // Kelajakdagi to'lovlar
+  final int debtMonthlyReserve; // Qarzlar uchun joriy oylik zaxira
   final int goalsAllocation; // Maqsadlar uchun ajratilgan
   final int safetyBuffer; // Xavfsizlik zaxirasi
   final int spendableAmount; // Sarflash mumkin bo'lgan erkin mablag'
@@ -89,6 +91,7 @@ class FinancialHealthState {
   const FinancialHealthState({
     required this.balance,
     this.upcomingDebts = 0,
+    this.debtMonthlyReserve = 0,
     this.goalsAllocation = 0,
     this.safetyBuffer = 500000,
     this.spendableAmount = 0,
@@ -108,6 +111,7 @@ class FinancialHealthState {
   static const FinancialHealthState initial = FinancialHealthState(
     balance: 0,
     upcomingDebts: 0,
+    debtMonthlyReserve: 0,
     goalsAllocation: 0,
     safetyBuffer: 500000,
     spendableAmount: 0,
@@ -134,7 +138,7 @@ class FinancialHealthState {
         riskLevel: riskLevel,
         impactBadge: 'Xarid summasini kiriting',
         consequenceMessage: 'Rejalashtirgan xaridingiz oylik byudjetingizga qanday ta\'sir qilishini ko\'ring.',
-        adviceMessage: 'Summani kiriting, ilova cho\'ntagingizga qarab xolis maslahat beradi.',
+        adviceMessage: 'Summani kiriting, ilova balansingiz va byudjetingizga asoslangan hisob-kitobni ko\'rsatadi.',
         safetyBuffer: safetyBuffer,
         safetyBufferImpact: 0,
         goalsDelayDays: 0,
@@ -145,8 +149,25 @@ class FinancialHealthState {
     final postBal = balance - amount;
     final postBudget = monthlyRemainingBudget - amount;
 
-    // Post spendable cash calculation considering debt obligations & buffer
-    final postSpendable = max(0, postBal - upcomingDebts - goalsAllocation - safetyBuffer);
+    // Realistik hisob: qarzning 100% qismini kundalik xarajatdan bir kunda yechib tashlamaymiz!
+    final int debtReserve = upcomingDebts > 0 && postBal > 0
+        ? min((postBal * 0.2).round(), upcomingDebts)
+        : 0;
+    final int goalReserve = goalsAllocation > 0 && postBal > 0
+        ? min((postBal * 0.1).round(), goalsAllocation)
+        : 0;
+    final int dynamicBuffer = postBal >= 2000000
+        ? min(500000, (postBal * 0.08).round())
+        : (postBal >= 500000 ? (postBal * 0.05).round() : 0);
+
+    int postSpendable = postBal - debtReserve - goalReserve - dynamicBuffer;
+    if (postSpendable < (postBal * 0.6).round()) {
+      postSpendable = (postBal * 0.75).round();
+    }
+    if (postSpendable < 0) {
+      postSpendable = max(0, postBal);
+    }
+
     final postSafeDaily = max(0, (postSpendable / max(1, daysRemainingInMonth)).floor());
 
     // Calculate post runway
@@ -171,21 +192,26 @@ class FinancialHealthState {
     final String message;
     final String advice;
 
-    if (postBudget < 0 || postBal < 0) {
+    final bool budgetExceeded = monthlyRemainingBudget > 0 && postBudget < 0;
+    final bool balanceExceeded = postBal < 0;
+
+    if (balanceExceeded || budgetExceeded) {
       calculatedRisk = FinancialRiskLevel.danger;
-      badge = 'Hozircha olmagan ma\'qul';
-      message = 'Bu xarajatdan so\'ng oy oxirigacha pulingiz yetmay qolishi mumkin.';
-      advice = 'Ushbu xaridni keyingi oyga qoldirganingiz yoki arzonroq variantini ko\'rganingiz ma\'qul.';
-    } else if (postBal < safetyBuffer || postSafeDaily < (safeToSpendToday * 0.65)) {
+      badge = 'Katta xarajat';
+      message = balanceExceeded
+          ? 'Ushbu summa joriy balansingizdan yuqori.'
+          : 'Bu xarajat oylik rejalashtirilgan byudjet limitidan oshib ketadi.';
+      advice = 'Xaridni rejalashtirishda joriy mablag‘ qoldig‘i va majburiyatlarni inobatga oling.';
+    } else if (postSafeDaily < (safeToSpendToday * 0.65) && safeToSpendToday > 0) {
       calculatedRisk = FinancialRiskLevel.caution;
-      badge = 'Olish mumkin, lekin tejash kerak';
-      message = 'Xariddan so\'ng oy oxirigacha har kungi xarajatingiz kamayadi.';
-      advice = 'Agar shuni olsangiz, oy oxirigacha har kungi xarajatni ${postSafeDaily > 0 ? (postSafeDaily ~/ 1000 * 1000) : 0} so\'mdan oshirmaslik tavsiya etiladi.';
+      badge = 'Me\'yorni o‘zgartiradi';
+      message = 'Xariddan so\'ng oy oxirigacha har kungi tavsiya etilgan xarajat kamayadi.';
+      advice = 'Xariddan so\'ng qolgan kunlarga kunlik me\'yor taxminan ${CurrencyFormatter.format(postSafeDaily)} / kun bo\'ladi.';
     } else {
       calculatedRisk = FinancialRiskLevel.safe;
-      badge = 'Bemalol olsangiz bo\'ladi';
+      badge = 'Me\'yor doirasida';
       message = 'Bu xarid sizning oylik byudjetingizga og\'irlik qilmaydi.';
-      advice = 'Oylik rejangiz buzilmaydi, qolgan pulingiz oy oxirigacha bemalol yetadi.';
+      advice = 'Oylik rejangiz buzilmaydi, qolgan mablag‘ingiz oy oxirigacha yetadi.';
     }
 
     return WhatIfResult(

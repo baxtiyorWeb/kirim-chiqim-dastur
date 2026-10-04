@@ -739,7 +739,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 Expanded(
                   child: Text(
                     isOverburning
-                        ? 'Xarajat tezligingiz normadan yuqori. Oylik byudjetingiz muddatidan oldin tugamasligi uchun kunlik sarfni kamaytirish tavsiya etiladi.'
+                        ? 'Xarajat sur\'ati biroz yuqori. Oylik byudjet me\'yorida yetishi uchun kunlik sarfni inobatga olish maqsadga muvofiq.'
                         : 'Byudjet me\'yorida ushlab turilibdi. Agar shunday davom etsa, oy oxirida byudjetingiz xavfsiz chegarada saqlanadi.',
                     style: TextStyle(
                       fontSize: 11.5,

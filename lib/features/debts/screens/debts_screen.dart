@@ -797,7 +797,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
         borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
         border: Border.all(
           color: isCritical
-              ? Colors.redAccent.withValues(alpha: 0.5)
+              ? Colors.amber.withValues(alpha: 0.35)
               : const Color(0xFF007A55).withValues(alpha: 0.3),
           width: 1.2,
         ),
@@ -821,14 +821,14 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: isCritical
-                          ? Colors.redAccent.withValues(alpha: 0.15)
+                          ? Colors.amber.withValues(alpha: 0.15)
                           : const Color(0xFF007A55).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isCritical ? Icons.warning_rounded : Icons.shield_outlined,
+                      isCritical ? Icons.info_outline_rounded : Icons.shield_outlined,
                       size: 16,
-                      color: isCritical ? Colors.redAccent : const Color(0xFF007A55),
+                      color: isCritical ? Colors.amber.shade800 : const Color(0xFF007A55),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -837,7 +837,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isCritical ? Colors.redAccent : const Color(0xFF007A55),
+                      color: isCritical ? Colors.amber.shade800 : const Color(0xFF007A55),
                     ),
                   ),
                 ],
@@ -924,7 +924,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isCritical
-                  ? Colors.redAccent.withValues(alpha: 0.1)
+                  ? Colors.amber.withValues(alpha: 0.1)
                   : colors.surfaceVariant.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
             ),
@@ -932,15 +932,15 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  isCritical ? Icons.error_outline_rounded : Icons.info_outline_rounded,
+                  isCritical ? Icons.info_outline_rounded : Icons.info_outline_rounded,
                   size: 16,
-                  color: isCritical ? Colors.redAccent : const Color(0xFF007A55),
+                  color: isCritical ? Colors.amber.shade800 : const Color(0xFF007A55),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     isCritical
-                        ? 'Olingan qarz balansingizdan ortiq. Qarzni zudlik bilan optimallashtirish va xarajatlarni to\'xtatish tavsiya qilinadi.'
+                        ? 'Olingan qarzlar joriy balansingizdan yuqori. Oylik byudjetingiz doirasida qarz to‘lovlarini bosqichma-bosqich rejalashtirib boring.'
                         : (borrowed == 0
                             ? 'Ajoyib! Olingan qarzlaringiz yo\'q, sof daromadingiz to\'liq shaxsiy maqsadlaringizga xizmat qiladi.'
                             : 'Olingan qarzlar qoplangandan so\'ng kassa zaxirangiz ${CurrencyFormatter.format(netCash)} bo\'ladi.'),

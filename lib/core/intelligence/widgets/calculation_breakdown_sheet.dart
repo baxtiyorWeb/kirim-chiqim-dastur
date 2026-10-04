@@ -183,31 +183,38 @@ Future<void> showCalculationBreakdownSheet(
                     ),
                     const SizedBox(height: 8),
 
-                    // 2. Debts
-                    _buildRow(
-                      label: 'Kelajakdagi to\'lovlar (qarzlar)',
-                      value: CurrencyFormatter.format(healthState.upcomingDebts),
-                      color: healthState.upcomingDebts > 0 ? Colors.amber.shade700 : colors.textSecondary,
-                      prefix: '- ',
-                    ),
-                    const SizedBox(height: 8),
+                    // 2. Debts reserve (oylik reja)
+                    if (healthState.debtMonthlyReserve > 0) ...[
+                      _buildRow(
+                        label: 'Qarzlar uchun oylik zaxira',
+                        value: CurrencyFormatter.format(healthState.debtMonthlyReserve),
+                        color: Colors.amber.shade700,
+                        prefix: '- ',
+                      ),
+                      const SizedBox(height: 8),
+                    ],
 
                     // 3. Goals
-                    _buildRow(
-                      label: 'Maqsadlar uchun zaxira',
-                      value: CurrencyFormatter.format(healthState.goalsAllocation),
-                      color: healthState.goalsAllocation > 0 ? AppColors.primary : colors.textSecondary,
-                      prefix: '- ',
-                    ),
-                    const SizedBox(height: 8),
+                    if (healthState.goalsAllocation > 0) ...[
+                      _buildRow(
+                        label: 'Maqsadlar uchun zaxira',
+                        value: CurrencyFormatter.format(healthState.goalsAllocation),
+                        color: AppColors.primary,
+                        prefix: '- ',
+                      ),
+                      const SizedBox(height: 8),
+                    ],
 
                     // 4. Safety buffer
-                    _buildRow(
-                      label: 'Xavfsizlik zaxirasi',
-                      value: CurrencyFormatter.format(healthState.safetyBuffer),
-                      color: colors.textSecondary,
-                      prefix: '- ',
-                    ),
+                    if (healthState.safetyBuffer > 0) ...[
+                      _buildRow(
+                        label: 'Ehtiyot zaxirasi',
+                        value: CurrencyFormatter.format(healthState.safetyBuffer),
+                        color: colors.textSecondary,
+                        prefix: '- ',
+                      ),
+                      const SizedBox(height: 8),
+                    ],
 
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 10),
@@ -216,7 +223,7 @@ Future<void> showCalculationBreakdownSheet(
 
                     // 5. Spendable cash
                     _buildRow(
-                      label: 'Erkin sarflash mumkin',
+                      label: 'Kundalik xarajatlar fondi',
                       value: CurrencyFormatter.format(healthState.spendableAmount),
                       color: const Color(0xFF10B981),
                       prefix: '= ',
