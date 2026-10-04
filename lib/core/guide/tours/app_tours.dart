@@ -20,7 +20,7 @@ class AppTours {
         id: 'welcome',
         title: '👋 Xush kelibsiz!',
         description:
-            'Moliyangizni boshqarish, xarajatlar va oylik smetani aniq nazorat qilishni bir necha qadamda o‘rganamiz.',
+            'Moliyangizni boshqarish, xarajatlar va oylik byudjetni aniq nazorat qilishni bir necha qadamda o‘rganamiz.',
         placement: GuidePlacement.center,
         nextButtonText: 'Boshlash',
       ),
@@ -49,12 +49,12 @@ class AppTours {
         placement: GuidePlacement.bottom,
       ),
 
-      // 3. Dashboard Smeta Remainder
+      // 3. Dashboard Byudjet Remainder
       const GuideStep(
-        id: 'smeta_remainder',
+        id: 'budget_remainder',
         targetId: 'dashboard_smeta_qoldiq',
         route: '/dashboard',
-        title: 'Smeta qoldig‘i',
+        title: 'Byudjet qoldig‘i',
         description:
             'Rejalashtirilgan oylik byudjetingizdan qancha limit mablag‘i qolganini shu yerda ko‘rishingiz mumkin.',
         borderRadius: 20.0,
@@ -91,7 +91,7 @@ class AppTours {
         id: 'budget',
         targetId: 'budget_overview_card',
         route: '/budget',
-        title: 'Oylik smeta (Budjet)',
+        title: 'Oylik byudjet',
         description:
             'Oy davomida qancha sarflashni rejalashtiring, limitlarni belgilang va ortiqcha xarajatlarning oldini oling.',
         borderRadius: 24.0,
@@ -126,12 +126,12 @@ class AppTours {
   /// Level 2 — Contextual Budget Tour
   static final GuideTour budgetContextualTour = GuideTour(
     id: budgetTourId,
-    title: 'Smeta bilan tanishuv',
+    title: 'Byudjet bilan tanishuv',
     steps: [
       const GuideStep(
         id: 'budget_overview',
         targetId: 'budget_overview_card',
-        title: 'Oylik smeta ko‘rsatkichi',
+        title: 'Oylik byudjet ko‘rsatkichi',
         description:
             'Bu oy uchun belgilangan umumiy limit, sarflangan summa va qolgan limit miqdorini aniq ko‘rsatadi.',
         borderRadius: 24.0,

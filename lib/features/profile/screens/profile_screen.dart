@@ -865,7 +865,7 @@ class ProfileScreen extends ConsumerWidget {
     final confirmed = await showConfirmSheet(
       context: context,
       title: 'Barcha ma\'lumotlarni o\'chirish',
-      message: 'DIQQAT: Barcha kiritilgan xarajatlar, daromadlar, qarzlar daftari va smeta butunlay o\'chiriladi. Bu amalni ortga qaytarib bo\'lmaydi!',
+      message: 'DIQQAT: Barcha kiritilgan xarajatlar, daromadlar, qarzlar daftari va byudjet butunlay o\'chiriladi. Bu amalni ortga qaytarib bo\'lmaydi!',
       confirmLabel: 'Ha, butunlay o\'chirilsin',
       cancelLabel: 'Bekor qilish',
       isDestructive: true,

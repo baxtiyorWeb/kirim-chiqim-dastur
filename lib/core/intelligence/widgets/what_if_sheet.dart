@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_dimensions.dart';
 import '../../utils/currency_formatter.dart';
@@ -8,8 +9,7 @@ import '../../utils/haptic_feedback_util.dart';
 import '../models/financial_health.dart';
 import '../providers/financial_intelligence_provider.dart';
 
-/// Interactive What-If Scenario Simulator Bottom Sheet
-/// Allows the user to simulate an expense before deciding to spend.
+/// Oddiy foydalanuvchiga tushunarli "Olsam bo'ladimi?" (Xaridni tekshirish) modali
 Future<void> showWhatIfSimulatorSheet(BuildContext context) {
   HapticUtil.selection();
   return showModalBottomSheet(
@@ -30,6 +30,7 @@ class WhatIfSheet extends ConsumerStatefulWidget {
 class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
   final TextEditingController _amountController = TextEditingController();
   int _currentAmount = 0;
+  bool _decisionRecorded = false;
 
   @override
   void dispose() {
@@ -43,6 +44,7 @@ class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
       _currentAmount = amount;
       _amountController.text = CurrencyFormatter.format(amount).replaceAll(' so\'m', '');
     });
+    _tryRecordDecision();
   }
 
   void _onAmountChanged(String val) {
@@ -51,21 +53,42 @@ class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
     setState(() {
       _currentAmount = parsed;
     });
+    if (parsed > 0) {
+      _tryRecordDecision();
+    }
+  }
+
+  void _tryRecordDecision() {
+    if (!_decisionRecorded && _currentAmount > 0) {
+      _decisionRecorded = true;
+      ref.read(evaluatedDecisionsCountProvider.notifier).recordDecision();
+    }
+  }
+
+  String _getEmojiForRisk(FinancialRiskLevel level) {
+    switch (level) {
+      case FinancialRiskLevel.safe:
+        return '🟢';
+      case FinancialRiskLevel.caution:
+        return '🟡';
+      case FinancialRiskLevel.danger:
+        return '🔴';
+    }
   }
 
   void _shareResult(WhatIfResult result) {
     HapticUtil.selection();
-    final text = 'Moliyaviy xarid hisobi xulosasi:\n'
-        '• Rejalashtirilgan xarid: ${CurrencyFormatter.format(result.scenarioAmount)}\n'
-        '• Xariddan so‘nggi balans: ${CurrencyFormatter.format(result.postBalance)}\n'
-        '• Yangi kunlik xarajat me\'yori: ${CurrencyFormatter.format(result.postSafeToSpendToday)}/kun\n'
-        '• Xulosa: ${result.consequenceMessage}\n\n'
-        'The Go-Getters ilovasi orqali hisoblandi.';
+    final text = '${CurrencyFormatter.format(result.scenarioAmount)} xaridni tekshirdim:\n'
+        '• Xulosa: ${_getEmojiForRisk(result.riskLevel)} ${result.impactBadge}\n'
+        '• Qoladigan pulim: ${CurrencyFormatter.format(result.currentBalance)} ➔ ${CurrencyFormatter.format(result.postBalance)}\n'
+        '• Kunlik xarajatim: ${CurrencyFormatter.format(result.currentSafeToSpendToday)} ➔ ${CurrencyFormatter.format(result.postSafeToSpendToday)}/kun\n\n'
+        'The Go-Getters ilovasida oldindan hisoblandi.';
+
     Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Xarid hisobi xulosasi nusxalandi'),
+          content: Text('Xulosa nusxalandi'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -100,291 +123,495 @@ class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
         right: AppDimensions.space20,
         bottom: MediaQuery.paddingOf(context).bottom + AppDimensions.space20,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Drag Handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colors.textSecondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colors.textSecondary.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppDimensions.space16),
+            const SizedBox(height: AppDimensions.space16),
 
-          // Header
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+            // Sarlavha: Oddiy va insoniy
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.calculate_outlined,
-                  color: AppColors.primary,
-                  size: 20,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Olsam bo\'ladimi?',
+                        style: TextStyle(
+                          color: colors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Text(
+                        'Xarid summasini kiriting, ilova cho\'ntagingizga qarab maslahat beradi',
+                        style: TextStyle(
+                          color: colors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close_rounded, color: colors.textSecondary, size: 20),
+                  splashRadius: 20,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: AppDimensions.space16),
+
+            // Summa kiritish
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: _onAmountChanged,
+              autofocus: true,
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Xarid summasi',
+                labelStyle: TextStyle(
+                  color: colors.textSecondary,
+                  fontSize: 13,
+                ),
+                hintText: '0',
+                hintStyle: TextStyle(
+                  color: colors.textSecondary.withValues(alpha: 0.4),
+                  fontSize: 17,
+                ),
+                suffixText: 'so\'m',
+                suffixStyle: TextStyle(
+                  color: colors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF191C22) : const Color(0xFFF8FAFC),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                  borderSide: BorderSide(
+                    color: colors.border.withValues(alpha: 0.7),
+                    width: 1,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+            ),
+
+            const SizedBox(height: AppDimensions.space12),
+
+            // Oson tanlash tugmalari
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  _buildPresetChip('50 ming', 50000),
+                  const SizedBox(width: 8),
+                  _buildPresetChip('100 ming', 100000),
+                  const SizedBox(width: 8),
+                  _buildPresetChip('300 ming', 300000),
+                  const SizedBox(width: 8),
+                  _buildPresetChip('500 ming', 500000),
+                  const SizedBox(width: 8),
+                  _buildPresetChip('1 mln', 1000000),
+                  const SizedBox(width: 8),
+                  _buildPresetChip('2 mln', 2000000),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: AppDimensions.space16),
+
+            // Natija kartasi
+            if (_currentAmount > 0) ...[
+              // 1. Katta va tushunarli Xulosa
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppDimensions.space16),
+                decoration: BoxDecoration(
+                  color: _getResultBgColor(result.riskLevel, isDark),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                  border: Border.all(
+                    color: _getResultBorderColor(result.riskLevel).withValues(alpha: 0.5),
+                    width: 1.3,
+                  ),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Text(_getEmojiForRisk(result.riskLevel), style: const TextStyle(fontSize: 18)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            result.impactBadge,
+                            style: TextStyle(
+                              color: _getResultBorderColor(result.riskLevel),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Text(
-                      'Xaridni hisoblash',
+                      result.consequenceMessage,
                       style: TextStyle(
                         color: colors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    Text(
-                      'Xarid qilishdan oldin oylik me\'yorga ta\'sirini tekshiring',
-                      style: TextStyle(
-                        color: colors.textSecondary,
-                        fontSize: 12,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        height: 1.35,
                       ),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.close_rounded, color: colors.textSecondary, size: 20),
-                splashRadius: 20,
-              ),
-            ],
-          ),
 
-          const SizedBox(height: AppDimensions.space16),
+              const SizedBox(height: AppDimensions.space12),
 
-          // Clean Standard Form Input Field (No nested block container)
-          TextField(
-            controller: _amountController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: _onAmountChanged,
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-            ),
-            decoration: InputDecoration(
-              labelText: 'Xarid summasi',
-              labelStyle: TextStyle(
-                color: colors.textSecondary,
-                fontSize: 13.5,
-              ),
-              hintText: '0',
-              hintStyle: TextStyle(
-                color: colors.textSecondary.withValues(alpha: 0.4),
-                fontSize: 16,
-              ),
-              prefixIcon: const Icon(
-                Icons.shopping_bag_outlined,
-                size: 20,
-                color: AppColors.primary,
-              ),
-              suffixText: 'so\'m',
-              suffixStyle: TextStyle(
-                color: colors.textSecondary,
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-              ),
-              filled: true,
-              fillColor: isDark ? const Color(0xFF191C22) : const Color(0xFFF8FAFC),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                borderSide: BorderSide(
-                  color: colors.border.withValues(alpha: 0.7),
-                  width: 1,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                borderSide: const BorderSide(
-                  color: AppColors.primary,
-                  width: 1.5,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: AppDimensions.space12),
-
-          // Quick Amount Preset Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                _buildPresetChip('+100 ming', 100000),
-                const SizedBox(width: 8),
-                _buildPresetChip('+300 ming', 300000),
-                const SizedBox(width: 8),
-                _buildPresetChip('+500 ming', 500000),
-                const SizedBox(width: 8),
-                _buildPresetChip('+1 mln', 1000000),
-                const SizedBox(width: 8),
-                _buildPresetChip('+2 mln', 2000000),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppDimensions.space16),
-
-          // Reactive Simulation Result Card
-          if (_currentAmount > 0) ...[
-            Container(
-              padding: const EdgeInsets.all(AppDimensions.space12),
-              decoration: BoxDecoration(
-                color: _getResultBgColor(result.riskLevel, isDark),
-                borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                border: Border.all(
-                  color: _getResultBorderColor(result.riskLevel).withValues(alpha: 0.5),
-                  width: 1,
-                ),
-              ),
-              child: Column(
+              // 2. Cho'ntakka ta'siri (Keng va qulay kartalar)
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _getResultIcon(result.riskLevel),
-                        color: _getResultBorderColor(result.riskLevel),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _getResultBadgeTitle(result.riskLevel),
-                        style: TextStyle(
-                          color: _getResultBorderColor(result.riskLevel),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13.5,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Cho\'ntakka ta\'siri:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    result.consequenceMessage,
-                    style: TextStyle(
-                      color: colors.textPrimary,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w400,
-                      height: 1.35,
-                    ),
-                  ),
-                  const Divider(height: 18),
 
-                  // Metrics Comparison Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // Qoladigan pul kartasi
+                  _buildImpactMetricCard(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Qoladigan pulingiz',
+                    before: CurrencyFormatter.format(result.currentBalance),
+                    after: CurrencyFormatter.format(result.postBalance),
+                    afterColor: result.postBalance >= 0 ? colors.textPrimary : Colors.red,
+                    colors: colors,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Kunlik me'yor kartasi
+                  _buildImpactMetricCard(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Har kungi me\'yoringiz',
+                    before: '${CurrencyFormatter.format(result.currentSafeToSpendToday)}/kun',
+                    after: '${CurrencyFormatter.format(result.postSafeToSpendToday)}/kun',
+                    afterColor: result.isSafe ? const Color(0xFF10B981) : Colors.amber.shade700,
+                    colors: colors,
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppDimensions.space12),
+
+              // 3. Maslahat (Tavsiya)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('💡', style: TextStyle(fontSize: 15)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        result.adviceMessage,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: colors.textPrimary,
+                          height: 1.35,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppDimensions.space12),
+
+              // PRO tafsilot havolasi
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/pricing');
+                },
+                borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildMetricCol(
-                        label: 'Yangi balans',
-                        value: CurrencyFormatter.format(result.postBalance),
-                        color: colors.textPrimary,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'PRO',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
-                      _buildMetricCol(
-                        label: 'Kunlik me\'yor',
-                        value: '${CurrencyFormatter.format(result.postSafeToSpendToday)}/kun',
-                        color: result.isSafe ? AppColors.primary : Colors.amber.shade700,
+                      const SizedBox(width: 6),
+                      Text(
+                        'Keyingi 30 kunlik batafsil tahlilni ko\'rish',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: colors.textSecondary,
+                        ),
                       ),
-                      _buildMetricCol(
-                        label: 'Yetish muddati',
-                        value: '~${result.postRunwayDays} kun',
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 11,
                         color: colors.textSecondary,
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: AppDimensions.space16),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF191C22) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                border: Border.all(color: colors.border.withValues(alpha: 0.6)),
+
+              const SizedBox(height: AppDimensions.space16),
+            ] else ...[
+              // Bo'sh holatdagi tushunarli yo'riqnoma
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF191C22) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                  border: Border.all(color: colors.border.withValues(alpha: 0.6)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('🛍️', style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Masalan, kiyim, telefon yoki kutilmagan xarid summasini kiriting. Ilova oylik pulingiz va har kungi sarfingizga qarab xolis maslahat beradi.',
+                        style: TextStyle(
+                          color: colors.textSecondary,
+                          fontSize: 12.5,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.info_outline_rounded,
-                    color: AppColors.primary,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
+              const SizedBox(height: AppDimensions.space16),
+            ],
+
+            // Harakat tugmalari
+            Row(
+              children: [
+                if (_currentAmount > 0)
                   Expanded(
-                    child: Text(
-                      'Xarid summasini kiriting va uning oylik mablag\'ingizga ta\'sirini oldindan bilib oling.',
-                      style: TextStyle(
-                        color: colors.textSecondary,
-                        fontSize: 12,
-                        height: 1.35,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _shareResult(result),
+                      icon: const Icon(Icons.share_outlined, size: 16),
+                      label: const Text('Ulashish', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppDimensions.space16),
-          ],
-
-          // Action Buttons
-          Row(
-            children: [
-              if (_currentAmount > 0)
+                if (_currentAmount > 0) const SizedBox(width: 12),
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _shareResult(result),
-                    icon: const Icon(Icons.share_outlined, size: 16),
-                    label: const Text('Ulashish', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
+                  flex: _currentAmount > 0 ? 1 : 2,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      HapticUtil.selection();
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
                       ),
                     ),
-                  ),
-                ),
-              if (_currentAmount > 0) const SizedBox(width: 12),
-              Expanded(
-                flex: _currentAmount > 0 ? 1 : 2,
-                child: ElevatedButton(
-                  onPressed: () {
-                    HapticUtil.selection();
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                    child: Text(
+                      _currentAmount > 0 ? 'Tushunarli' : 'Yopish',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
                     ),
                   ),
-                  child: Text(
-                    _currentAmount > 0 ? 'Tushunarli' : 'Yopish',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                  ),
                 ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImpactMetricCard({
+    required IconData icon,
+    required String label,
+    required String before,
+    required String after,
+    required Color afterColor,
+    required dynamic colors,
+    required bool isDark,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF191C22) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+        border: Border.all(color: colors.border.withValues(alpha: 0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 15, color: colors.textSecondary),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: colors.textSecondary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Oldingi holat
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Oldin',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: colors.textSecondary.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    before,
+                    style: TextStyle(
+                      color: colors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+
+              // O'tish belgisi
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF232730) : const Color(0xFFE2E8F0),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 13,
+                  color: colors.textSecondary,
+                ),
+              ),
+
+              // Yangi holat
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Xariddan keyin',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: colors.textSecondary.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    after,
+                    style: TextStyle(
+                      color: afterColor,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -420,35 +647,6 @@ class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
     );
   }
 
-  Widget _buildMetricCol({
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey.shade400,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
   Color _getResultBgColor(FinancialRiskLevel level, bool isDark) {
     switch (level) {
       case FinancialRiskLevel.safe:
@@ -468,28 +666,6 @@ class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
         return const Color(0xFFFFB300);
       case FinancialRiskLevel.danger:
         return const Color(0xFFE53935);
-    }
-  }
-
-  IconData _getResultIcon(FinancialRiskLevel level) {
-    switch (level) {
-      case FinancialRiskLevel.safe:
-        return Icons.check_circle_outline_rounded;
-      case FinancialRiskLevel.caution:
-        return Icons.warning_amber_rounded;
-      case FinancialRiskLevel.danger:
-        return Icons.error_outline_rounded;
-    }
-  }
-
-  String _getResultBadgeTitle(FinancialRiskLevel level) {
-    switch (level) {
-      case FinancialRiskLevel.safe:
-        return 'Xavfsiz xarid';
-      case FinancialRiskLevel.caution:
-        return 'Ehtiyotkorlik talab etiladi';
-      case FinancialRiskLevel.danger:
-        return 'Kamomad xavfi bor';
     }
   }
 }

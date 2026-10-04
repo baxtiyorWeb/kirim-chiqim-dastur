@@ -184,6 +184,17 @@ class LocalStorageService {
     }
   }
 
+  static const String _evaluatedDecisionsKey = 'evaluated_decisions_count';
+
+  int getEvaluatedDecisionsCount() {
+    return _prefs.getInt(_evaluatedDecisionsKey) ?? 4;
+  }
+
+  Future<void> incrementEvaluatedDecisionsCount() async {
+    final current = getEvaluatedDecisionsCount();
+    await _prefs.setInt(_evaluatedDecisionsKey, current + 1);
+  }
+
   /// Secure session clear on logout
   Future<void> clearAllData() async {
     await _prefs.remove(_authTokenKey);

@@ -230,7 +230,7 @@ void showSupportBottomSheet(BuildContext context) {
       final faqItems = [
         {'q': 'Tranzaksiyani qanday tahrirlayman?', 'a': 'Xarajatlar sahifasida kerakli yozuv ustiga bosing.'},
         {'q': 'Qarz yopilganda balansga ta\'sir qiladimi?', 'a': 'Qarz to\'langanda istasangiz buni xarajat yoki daromad sifatida ham kiritishingiz mumkin.'},
-        {'q': 'Smeta (budjet) limiti oshsa nima bo\'ladi?', 'a': 'Ilova ogohlantiruvchi qizil indikator bilan xabar beradi.'},
+        {'q': 'Byudjet limiti oshsa nima bo\'ladi?', 'a': 'Ilova ogohlantiruvchi qizil indikator bilan xabar beradi.'},
         {'q': 'Ma\'lumotlarim qayerda saqlanadi?', 'a': 'Hozirda qurilmangizning xavfsiz xotirasida saqlanadi va oflayn rejimda ishlaydi.'},
       ];
 

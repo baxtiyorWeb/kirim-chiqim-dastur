@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/intelligence/models/financial_health.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/animated_number.dart';
 
@@ -10,17 +11,21 @@ class DashboardHeroCard extends StatelessWidget {
   final int initialBalance;
   final int totalExpenses;
   final int safeToSpendToday;
+  final FinancialRiskLevel riskLevel;
   final VoidCallback? onTap;
   final VoidCallback? onSimulatorTap;
+  final VoidCallback? onBreakdownTap;
 
   const DashboardHeroCard({
     super.key,
     required this.balance,
     this.initialBalance = 0,
-    required this.totalExpenses,
+    this.totalExpenses = 0,
     this.safeToSpendToday = 0,
+    this.riskLevel = FinancialRiskLevel.safe,
     this.onTap,
     this.onSimulatorTap,
+    this.onBreakdownTap,
   });
 
   @override
@@ -51,7 +56,7 @@ class DashboardHeroCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Row: Label & Sparkline Chart Icon
+            // Top Row: Label & Financial Health Status Indicator
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -59,33 +64,20 @@ class DashboardHeroCard extends StatelessWidget {
                   AppStrings.totalBalance,
                   style: TextStyle(
                     color: AppColors.textWhite70,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.2,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.1,
                   ),
                 ),
-                // Sparkline / Bar mini indicator
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _miniBar(8, Colors.white.withValues(alpha: 0.6)),
-                      const SizedBox(width: 3),
-                      _miniBar(14, Colors.white.withValues(alpha: 0.8)),
-                      const SizedBox(width: 3),
-                      _miniBar(18, Colors.white),
-                    ],
-                  ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onBreakdownTap,
+                  child: _buildHealthStatus(),
                 ),
               ],
             ),
 
-            const SizedBox(height: AppDimensions.space12),
+            const SizedBox(height: AppDimensions.space8),
 
             // Large Amount Text (Umumiy balans)
             AnimatedCurrencyText(
@@ -102,69 +94,81 @@ class DashboardHeroCard extends StatelessWidget {
 
             // Daily spending norm & Calculate action
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF34D399),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Bugungi xarajat me\'yori',
-                          style: TextStyle(
-                            color: AppColors.textWhite70,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onBreakdownTap,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Bugungi xarajat me\'yori',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.help_outline_rounded,
+                                size: 12.5,
+                                color: Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          '${CurrencyFormatter.format(safeToSpendToday)} / kun',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                          const SizedBox(height: 2),
+                          Text(
+                            '${CurrencyFormatter.format(safeToSpendToday)} / kun',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   GestureDetector(
                     onTap: onSimulatorTap,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.calculate_outlined,
+                            Icons.check_circle_outline_rounded,
                             size: 14,
                             color: AppColors.primary,
                           ),
-                          SizedBox(width: 4),
+                          SizedBox(width: 4.5),
                           Text(
-                            'Hisoblash',
+                            'Tekshirish',
                             style: TextStyle(
                               color: AppColors.primary,
-                              fontSize: 11.5,
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -175,72 +179,60 @@ class DashboardHeroCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            const SizedBox(height: AppDimensions.space12),
-
-            // Sub-info Row: Boshlang'ich & Bu oy xarajat
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                if (initialBalance > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-                    ),
-                    child: Text(
-                      'Boshlang\'ich: ${CurrencyFormatter.format(initialBalance)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.trending_down_rounded,
-                        color: Color(0xFF6EE7B7),
-                        size: 14,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Bu oy xarajat: -${CurrencyFormatter.format(totalExpenses)}',
-                        style: const TextStyle(
-                          color: Color(0xFF6EE7B7),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _miniBar(double height, Color color) {
-    return Container(
-      width: 3.5,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(2),
-      ),
+  Widget _buildHealthStatus() {
+    Color dotColor;
+    String statusText;
+
+    switch (riskLevel) {
+      case FinancialRiskLevel.safe:
+        dotColor = const Color(0xFF34D399);
+        statusText = 'Holat barqaror';
+        break;
+      case FinancialRiskLevel.caution:
+        dotColor = const Color(0xFFFBBF24);
+        statusText = 'E\'tibor talab';
+        break;
+      case FinancialRiskLevel.danger:
+        dotColor = const Color(0xFFF87171);
+        statusText = 'Xavfli xarajat';
+        break;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: dotColor,
+            boxShadow: [
+              BoxShadow(
+                color: dotColor.withValues(alpha: 0.6),
+                blurRadius: 4,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          statusText,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.92),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1,
+          ),
+        ),
+      ],
     );
   }
 }

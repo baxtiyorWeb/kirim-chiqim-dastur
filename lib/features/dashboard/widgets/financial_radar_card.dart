@@ -74,18 +74,18 @@ class FinancialRadarCard extends ConsumerWidget {
                 ],
               ),
 
-              // Streak indicator
+              // Product-native decision metric
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('🔥', style: TextStyle(fontSize: 12)),
+                  const Icon(Icons.psychology_outlined, size: 14, color: AppColors.primary),
                   const SizedBox(width: 4),
                   Text(
-                    '${healthState.disciplineStreakDays} kunlik intizom',
+                    '${healthState.evaluatedDecisionsCount} ta qaror hisoblandi',
                     style: TextStyle(
                       color: colors.textSecondary,
                       fontSize: 11,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],

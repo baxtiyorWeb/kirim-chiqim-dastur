@@ -66,7 +66,7 @@ class FintechQuickBanners extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Oylik smeta (Budjet)',
+                            'Oylik byudjet',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,

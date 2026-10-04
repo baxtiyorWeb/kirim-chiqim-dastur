@@ -55,7 +55,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       backgroundColor: colors.background,
       appBar: AppBar(
         title: Text(
-          'Oylik smeta (Budjet)',
+          'Oylik byudjet',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -65,7 +65,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.edit_note_rounded, color: colors.textPrimary),
-            tooltip: 'Smetani tahrirlash',
+            tooltip: 'Byudjetni tahrirlash',
             onPressed: () => _editMonthlyBudgetDialog(context, ref, totalBudget),
           ),
         ],
@@ -107,7 +107,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Umumiy oylik smeta',
+                          'Umumiy oylik byudjet',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -191,7 +191,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Smetadan qolgan limit:',
+                          'Qolgan byudjet limiti:',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -400,7 +400,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Oylik smetani o\'zgartirish',
+                    'Oylik byudjetni o\'zgartirish',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -436,7 +436,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Oylik smeta yangilandi'),
+                                        content: Text('Oylik byudjet yangilandi'),
                                         backgroundColor: AppColors.primary,
                                         behavior: SnackBarBehavior.floating,
                                       ),
@@ -632,7 +632,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Smeta holati va sur\'ati',
+                    'Byudjet holati va sur\'ati',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -739,8 +739,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 Expanded(
                   child: Text(
                     isOverburning
-                        ? 'Xarajat tezligingiz normadan yuqori. Oylik smetangiz muddatidan oldin tugamasligi uchun kunlik sarfni kamaytirish tavsiya etiladi.'
-                        : 'Smeta me\'yorida ushlab turilibdi. Agar shunday davom etsa, oy oxirida smetangiz xavfsiz chegarada saqlanadi.',
+                        ? 'Xarajat tezligingiz normadan yuqori. Oylik byudjetingiz muddatidan oldin tugamasligi uchun kunlik sarfni kamaytirish tavsiya etiladi.'
+                        : 'Byudjet me\'yorida ushlab turilibdi. Agar shunday davom etsa, oy oxirida byudjetingiz xavfsiz chegarada saqlanadi.',
                     style: TextStyle(
                       fontSize: 11.5,
                       height: 1.35,

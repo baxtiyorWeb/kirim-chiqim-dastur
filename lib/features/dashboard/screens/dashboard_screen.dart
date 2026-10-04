@@ -7,11 +7,11 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/guide/guide.dart';
 import '../../../core/intelligence/providers/financial_intelligence_provider.dart';
 import '../../../core/intelligence/widgets/what_if_sheet.dart';
+import '../../../core/intelligence/widgets/calculation_breakdown_sheet.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
 import '../../../core/widgets/app_bottom_sheets.dart';
 import '../../../providers/finance_providers.dart';
 import '../widgets/dashboard_hero_card.dart';
-import '../widgets/financial_radar_card.dart';
 import '../widgets/metric_summary_cards.dart';
 import '../widgets/categories_horizontal_list.dart';
 import '../widgets/recent_expenses_list.dart';
@@ -173,6 +173,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       initialBalance: ref.watch(initialBalanceProvider),
                       totalExpenses: totalExpenses,
                       safeToSpendToday: healthState.safeToSpendToday,
+                      riskLevel: healthState.riskLevel,
                       onTap: () {
                         HapticUtil.light();
                         context.push('/statistics');
@@ -181,19 +182,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         HapticUtil.medium();
                         showWhatIfSimulatorSheet(context);
                       },
+                      onBreakdownTap: () {
+                        HapticUtil.selection();
+                        showCalculationBreakdownSheet(context, healthState);
+                      },
                     ),
                   ),
                 ),
 
-                const SizedBox(height: AppDimensions.space12),
+                const SizedBox(height: AppDimensions.space16),
 
-                // Financial Radar Card (Live predictive radar & risk warnings)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppDimensions.space20),
-                  child: FinancialRadarCard(),
+                // Categories Horizontal List (directly below Umumiy balans)
+                CategoriesHorizontalList(
+                  categoryExpenses: categoryExpenses,
+                  onViewAll: () => context.push('/transactions'),
+                  onCategoryTap: (cat) => context.push('/transactions'),
                 ),
 
-                const SizedBox(height: AppDimensions.space12),
+                const SizedBox(height: AppDimensions.space16),
 
                 // 2 Metric Summary Cards: "Bu oy" & "Qolgan mablag'"
                 Padding(
@@ -204,15 +210,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     onMonthTap: () => context.push('/transactions'),
                     onRemainingTap: () => context.push('/budget'),
                   ),
-                ),
-
-                const SizedBox(height: AppDimensions.space16),
-
-                // Categories Horizontal List (from server category aggregates)
-                CategoriesHorizontalList(
-                  categoryExpenses: categoryExpenses,
-                  onViewAll: () => context.push('/transactions'),
-                  onCategoryTap: (cat) => context.push('/transactions'),
                 ),
 
                 const SizedBox(height: AppDimensions.space16),
