@@ -10,6 +10,7 @@ import '../../../core/intelligence/widgets/what_if_sheet.dart';
 import '../../../core/intelligence/widgets/calculation_breakdown_sheet.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
 import '../../../core/widgets/app_bottom_sheets.dart';
+import '../../../core/widgets/initial_balance_dialog.dart';
 import '../../../providers/finance_providers.dart';
 import '../widgets/dashboard_hero_card.dart';
 import '../widgets/metric_summary_cards.dart';
@@ -176,7 +177,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       riskLevel: healthState.riskLevel,
                       onTap: () {
                         HapticUtil.light();
-                        context.push('/statistics');
+                        if (balance == 0 && ref.read(initialBalanceProvider) == 0) {
+                          showInitialBalanceDialog(context, ref);
+                        } else {
+                          context.push('/statistics');
+                        }
                       },
                       onSimulatorTap: () {
                         HapticUtil.medium();
@@ -191,6 +196,87 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
 
                 const SizedBox(height: AppDimensions.space16),
+
+                // Boshlang'ich mablag'ni kiritish taklifi (agar hali kiritilmagan bo'lsa)
+                if (ref.watch(initialBalanceProvider) == 0 && balance == 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.account_balance_wallet_rounded,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Boshlang\'ich mablag\'ni kiriting',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13.5,
+                                    color: colors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Balans, byudjet va kunlik me\'yorni bir vaqtda hisoblash uchun',
+                                  style: TextStyle(
+                                    color: colors.textSecondary,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              HapticUtil.selection();
+                              showInitialBalanceDialog(context, ref);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Kiritish',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.space16),
+                ],
 
                 // Categories Horizontal List (directly below Umumiy balans)
                 CategoriesHorizontalList(

@@ -789,19 +789,18 @@ class FinanceRepository {
     return 0;
   }
 
-  Future<void> setInitialBalance(int amount) async {
+  Future<void> setInitialBalance(int amount, {bool alsoUpdateMonthlyLimit = true}) async {
     _userProfile = _userProfile.copyWith(initialBalance: amount);
-    _dashboardSummary = DashboardSummary(
+    final newLimit = alsoUpdateMonthlyLimit ? amount : _dashboardSummary.totalMonthlyLimit;
+    final newRemaining = alsoUpdateMonthlyLimit
+        ? (amount - _dashboardSummary.monthExpense > 0 ? amount - _dashboardSummary.monthExpense : 0)
+        : _dashboardSummary.remainingBudget;
+
+    _dashboardSummary = _dashboardSummary.copyWith(
       balance: amount + _dashboardSummary.totalIncome - _dashboardSummary.totalExpense,
       initialBalance: amount,
-      totalIncome: _dashboardSummary.totalIncome,
-      totalExpense: _dashboardSummary.totalExpense,
-      todayIncome: _dashboardSummary.todayIncome,
-      todayExpense: _dashboardSummary.todayExpense,
-      monthExpense: _dashboardSummary.monthExpense,
-      remainingBudget: _dashboardSummary.remainingBudget,
-      categoryExpenses: _dashboardSummary.categoryExpenses,
-      recentTransactions: _dashboardSummary.recentTransactions,
+      totalMonthlyLimit: newLimit,
+      remainingBudget: newRemaining,
       hasLoaded: true,
     );
     if (isAuthenticated) {

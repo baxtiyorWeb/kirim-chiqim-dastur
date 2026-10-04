@@ -1108,12 +1108,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   children: [
                     const Icon(Icons.flash_on_rounded, size: 16, color: Color(0xFF007A55)),
                     const SizedBox(width: 6),
-                    Text(
-                      'Test kodi: $_receivedDevOtp (bosing va tasdiqlang)',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF007A55),
+                    Flexible(
+                      child: Text(
+                        'Test kodi: $_receivedDevOtp (bosing va tasdiqlang)',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF007A55),
+                        ),
                       ),
                     ),
                   ],

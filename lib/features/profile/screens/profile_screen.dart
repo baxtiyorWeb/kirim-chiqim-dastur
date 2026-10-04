@@ -8,6 +8,7 @@ import '../../../core/guide/guide.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
 import '../../../core/widgets/app_bottom_sheets.dart';
+import '../../../core/widgets/initial_balance_dialog.dart';
 import '../../../providers/finance_providers.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -755,110 +756,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   void _editInitialBalanceDialog(BuildContext context, WidgetRef ref) {
-    final current = ref.read(initialBalanceProvider);
-    final controller = TextEditingController(
-      text: current > 0 ? CurrencyFormatter.format(current, includeSymbol: false) : '',
-    );
-    final colors = context.appColors;
-    bool isSubmitting = false;
-
-    showAppModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 8,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Boshlang\'ich balansni kiritish',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Ushbu summa barcha kirim va chiqimlaringiz hisob-kitobining asosiy boshlang\'ich nuqtasi bo\'ladi.',
-                    style: TextStyle(fontSize: 12, color: colors.textSecondary),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [CurrencyInputFormatter()],
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Boshlang\'ich summa',
-                      suffixText: 'so\'m',
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: AppDimensions.buttonHeight,
-                    child: ElevatedButton(
-                      onPressed: isSubmitting
-                          ? null
-                          : () async {
-                              final amt = CurrencyFormatter.parse(controller.text);
-                              setState(() => isSubmitting = true);
-                              try {
-                                await ref.read(initialBalanceProvider.notifier).setInitialBalance(amt);
-                                HapticUtil.success();
-                                if (ctx.mounted) {
-                                  Navigator.pop(ctx);
-                                }
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Boshlang\'ich balans muvaffaqiyatli saqlandi (${CurrencyFormatter.format(amt)})'),
-                                      backgroundColor: AppColors.primary,
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                if (ctx.mounted) {
-                                  setState(() => isSubmitting = false);
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Xatolik: $e'),
-                                      backgroundColor: colors.expense,
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                      child: isSubmitting
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+    showInitialBalanceDialog(context, ref);
   }
 
   Future<void> _handleDeleteAccount(BuildContext context, WidgetRef ref) async {

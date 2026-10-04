@@ -507,16 +507,30 @@ class InitialBalanceNotifier extends Notifier<int> {
     state = balance ?? 0;
   }
 
-  Future<void> setInitialBalance(int amount) async {
+  Future<void> setInitialBalance(int amount, {bool syncWithBudget = true}) async {
     final repo = ref.read(financeRepositoryProvider);
-    await repo.setInitialBalance(amount);
+    await repo.setInitialBalance(amount, alsoUpdateMonthlyLimit: syncWithBudget);
     state = amount;
+
+    if (syncWithBudget) {
+      try {
+        await ref.read(budgetProvider.notifier).updateMonthlyBudget(amount);
+      } catch (e) {
+        debugPrint('[InitialBalanceNotifier] syncWithBudget notice: $e');
+      }
+    }
+
     // Push updated ledger to dashboard summary optimistically and sync with server
     final summary = repo.getDashboardSummary();
     ref.read(dashboardSummaryProvider.notifier).updateOptimistically(summary);
     try {
       await ref.read(dashboardSummaryProvider.notifier).refresh();
     } catch (_) {}
+  }
+
+  /// Sets the unified financial baseline (both initial balance and monthly budget limit)
+  Future<void> setInitialFinancialBase(int amount) async {
+    await setInitialBalance(amount, syncWithBudget: true);
   }
 }
 
