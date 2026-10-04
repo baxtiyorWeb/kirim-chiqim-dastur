@@ -73,7 +73,7 @@ class ApiClient {
       final currentBase = candidates[i];
       try {
         final uri = _buildUri(currentBase, endpoint, queryParams);
-        final request = await _httpClient.openUrl(method, uri).timeout(const Duration(seconds: 8));
+        final request = await _httpClient.openUrl(method, uri).timeout(const Duration(seconds: 25));
 
         // 1. MUST set all headers BEFORE writing any body data
         _buildHeaders().forEach((k, v) => request.headers.set(k, v));
@@ -85,7 +85,7 @@ class ApiClient {
           request.add(bodyBytes);
         }
 
-        final response = await request.close().timeout(const Duration(seconds: 8));
+        final response = await request.close().timeout(const Duration(seconds: 25));
         final result = await _processResponse(response);
         // If successful and on fallback, update baseUrl
         if (currentBase != baseUrl) {
