@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 /// Production grade currency formatter for Uzbek So'm (UZS).
@@ -51,5 +52,83 @@ class CurrencyFormatter {
     final parsed = parse(rawText);
     if (parsed == 0) return '';
     return format(parsed, includeSymbol: false);
+  }
+}
+
+/// Real-time automatic currency input formatter that inserts thousand space separators
+/// (e.g. 50000 -> "50 000", 1000000 -> "1 000 000") while precisely maintaining cursor position.
+class CurrencyInputFormatter extends TextInputFormatter {
+  final int maxDigits;
+
+  CurrencyInputFormatter({this.maxDigits = 14}); // Up to 99 trillion UZS
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    // Strip non-digits
+    String cleanText = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    if (cleanText.isEmpty) {
+      return newValue.copyWith(
+        text: '',
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    // Limit maximum digits
+    if (cleanText.length > maxDigits) {
+      cleanText = cleanText.substring(0, maxDigits);
+    }
+
+    // Parse number
+    final number = int.tryParse(cleanText);
+    if (number == null) {
+      return oldValue;
+    }
+
+    final formatted = CurrencyFormatter.format(number, includeSymbol: false);
+
+    // Calculate how many digits were before the cursor in newValue
+    int cursorPosition = newValue.selection.end;
+    int digitsBeforeCursor = 0;
+    for (int i = 0; i < cursorPosition && i < newValue.text.length; i++) {
+      if (RegExp(r'\d').hasMatch(newValue.text[i])) {
+        digitsBeforeCursor++;
+      }
+    }
+
+    if (digitsBeforeCursor > cleanText.length) {
+      digitsBeforeCursor = cleanText.length;
+    }
+
+    // Map digit count to cursor index in formatted string
+    int newCursor = 0;
+    int currentDigits = 0;
+    for (int i = 0; i < formatted.length; i++) {
+      if (RegExp(r'\d').hasMatch(formatted[i])) {
+        currentDigits++;
+      }
+      if (currentDigits == digitsBeforeCursor) {
+        newCursor = i + 1;
+        break;
+      }
+    }
+
+    if (digitsBeforeCursor == 0) {
+      newCursor = 0;
+    }
+    if (newCursor > formatted.length) {
+      newCursor = formatted.length;
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: newCursor),
+    );
   }
 }

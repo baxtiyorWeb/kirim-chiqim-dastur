@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 DO $$
+DECLARE
+    r RECORD;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='categories' AND column_name='category_type') THEN
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='categories' AND column_name='type') THEN
@@ -43,12 +45,23 @@ BEGIN
             ALTER TABLE categories ADD COLUMN category_type VARCHAR(20) NOT NULL DEFAULT 'expense';
         END IF;
     END IF;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='categories' AND column_name='icon_name') THEN
-        ALTER TABLE categories ALTER COLUMN icon_name DROP NOT NULL;
-    END IF;
+
+    -- Dynamically drop NOT NULL constraint from any existing legacy columns in categories table
+    FOR r IN (
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'categories' 
+          AND column_name NOT IN ('id', 'name')
+          AND is_nullable = 'NO'
+    ) LOOP
+        EXECUTE 'ALTER TABLE categories ALTER COLUMN "' || r.column_name || '" DROP NOT NULL';
+    END LOOP;
+
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon VARCHAR(100) NOT NULL DEFAULT 'category';
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_name VARCHAR(100) DEFAULT 'category';
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS color VARCHAR(30) NOT NULL DEFAULT '#FF6B6B';
+    ALTER TABLE categories ADD COLUMN IF NOT EXISTS color_hex VARCHAR(30) DEFAULT '#FF6B6B';
+    ALTER TABLE categories ADD COLUMN IF NOT EXISTS bg_color_hex VARCHAR(30) DEFAULT '#FFEAEA';
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT TRUE;
 
     -- Reset any legacy dummy 5,000,000 budget limits
@@ -56,26 +69,27 @@ BEGIN
 END $$;
 
 -- Seed default categories if not present
-INSERT INTO categories (id, name, category_type, icon, icon_name, color, is_default) VALUES
-    ('food', 'Oziq-ovqat', 'expense', 'restaurant', 'restaurant', '#FF6B6B', TRUE),
-    ('transport', 'Transport', 'expense', 'directions_car', 'directions_car', '#4D96FF', TRUE),
-    ('utilities', 'Kommunal', 'expense', 'home', 'home', '#6BCB77', TRUE),
-    ('entertainment', 'Ko''ngilochar', 'expense', 'sports_esports', 'sports_esports', '#FFD93D', TRUE),
-    ('shopping', 'Xaridlar', 'expense', 'shopping_bag', 'shopping_bag', '#9B51E0', TRUE),
-    ('health', 'Salomatlik', 'expense', 'medical_services', 'medical_services', '#FF8066', TRUE),
-    ('education', 'Ta''lim', 'expense', 'school', 'school', '#00C9A7', TRUE),
-    ('other_expense', 'Boshqa', 'expense', 'more_horiz', 'more_horiz', '#84817A', TRUE),
-    ('salary', 'Oylik maosh', 'income', 'payments', 'payments', '#2ECC71', TRUE),
-    ('business', 'Biznes', 'income', 'store', 'store', '#3498DB', TRUE),
-    ('freelance', 'Frilans', 'income', 'laptop', 'laptop', '#9B59B6', TRUE),
-    ('gift', 'Sovg''a', 'income', 'card_giftcard', 'card_giftcard', '#E67E22', TRUE),
-    ('other_income', 'Boshqa daromad', 'income', 'add_circle', 'add_circle', '#1ABC9C', TRUE)
+INSERT INTO categories (id, name, category_type, icon, icon_name, color, color_hex, is_default) VALUES
+    ('food', 'Oziq-ovqat', 'expense', 'restaurant', 'restaurant', '#FF6B6B', '#FF6B6B', TRUE),
+    ('transport', 'Transport', 'expense', 'directions_car', 'directions_car', '#4D96FF', '#4D96FF', TRUE),
+    ('utilities', 'Kommunal', 'expense', 'home', 'home', '#6BCB77', '#6BCB77', TRUE),
+    ('entertainment', 'Ko''ngilochar', 'expense', 'sports_esports', 'sports_esports', '#FFD93D', '#FFD93D', TRUE),
+    ('shopping', 'Xaridlar', 'expense', 'shopping_bag', 'shopping_bag', '#9B51E0', '#9B51E0', TRUE),
+    ('health', 'Salomatlik', 'expense', 'medical_services', 'medical_services', '#FF8066', '#FF8066', TRUE),
+    ('education', 'Ta''lim', 'expense', 'school', 'school', '#00C9A7', '#00C9A7', TRUE),
+    ('other_expense', 'Boshqa', 'expense', 'more_horiz', 'more_horiz', '#84817A', '#84817A', TRUE),
+    ('salary', 'Oylik maosh', 'income', 'payments', 'payments', '#2ECC71', '#2ECC71', TRUE),
+    ('business', 'Biznes', 'income', 'store', 'store', '#3498DB', '#3498DB', TRUE),
+    ('freelance', 'Frilans', 'income', 'laptop', 'laptop', '#9B59B6', '#9B59B6', TRUE),
+    ('gift', 'Sovg''a', 'income', 'card_giftcard', 'card_giftcard', '#E67E22', '#E67E22', TRUE),
+    ('other_income', 'Boshqa daromad', 'income', 'add_circle', 'add_circle', '#1ABC9C', '#1ABC9C', TRUE)
 ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     category_type = EXCLUDED.category_type,
     icon = EXCLUDED.icon,
     icon_name = EXCLUDED.icon_name,
-    color = EXCLUDED.color;
+    color = EXCLUDED.color,
+    color_hex = EXCLUDED.color_hex;
 
 -- 3. TRANSACTIONS TABLE
 CREATE TABLE IF NOT EXISTS transactions (

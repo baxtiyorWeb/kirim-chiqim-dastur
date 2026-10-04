@@ -286,6 +286,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                         child: TextField(
                           controller: _amountController,
                           keyboardType: TextInputType.number,
+                          inputFormatters: [CurrencyInputFormatter()],
                           onChanged: _onAmountChanged,
                           style: TextStyle(
                             fontSize: 24,

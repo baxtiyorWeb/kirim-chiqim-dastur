@@ -250,6 +250,7 @@ class GoalsScreen extends ConsumerWidget {
               TextField(
                 controller: controller,
                 keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyInputFormatter()],
                 autofocus: true,
                 decoration: const InputDecoration(
                   labelText: 'Qo\'shiladigan summa',
@@ -331,6 +332,7 @@ class GoalsScreen extends ConsumerWidget {
               TextField(
                 controller: amountController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyInputFormatter()],
                 decoration: const InputDecoration(labelText: 'Kerakli summa (so\'m)', suffixText: 'so\'m'),
               ),
               const SizedBox(height: 20),

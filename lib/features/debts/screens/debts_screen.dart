@@ -642,6 +642,7 @@ class _DebtsScreenState extends ConsumerState<DebtsScreen> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [CurrencyInputFormatter()],
                       decoration: const InputDecoration(labelText: 'Summa (so\'m)', suffixText: 'so\'m'),
                     ),
                     const SizedBox(height: 10),

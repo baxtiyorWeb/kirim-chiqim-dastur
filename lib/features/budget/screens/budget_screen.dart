@@ -361,6 +361,7 @@ class BudgetScreen extends ConsumerWidget {
               TextField(
                 controller: controller,
                 keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyInputFormatter()],
                 autofocus: true,
                 decoration: const InputDecoration(
                   labelText: 'Yangi oylik limit',
@@ -443,6 +444,7 @@ class BudgetScreen extends ConsumerWidget {
               TextField(
                 controller: controller,
                 keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyInputFormatter()],
                 autofocus: true,
                 decoration: InputDecoration(
                   labelText: '${cat.name} uchun oylik limit',

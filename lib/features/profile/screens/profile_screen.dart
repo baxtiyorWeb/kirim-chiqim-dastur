@@ -654,6 +654,7 @@ class ProfileScreen extends ConsumerWidget {
               TextField(
                 controller: controller,
                 keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyInputFormatter()],
                 autofocus: true,
                 decoration: const InputDecoration(
                   labelText: 'Boshlang\'ich summa',

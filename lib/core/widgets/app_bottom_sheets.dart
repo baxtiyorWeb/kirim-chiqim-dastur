@@ -550,6 +550,7 @@ void showAddEditTransactionSheet(
                               child: TextField(
                                 controller: amountController,
                                 keyboardType: TextInputType.number,
+                                inputFormatters: [CurrencyInputFormatter()],
                                 autofocus: !isEditing,
                                 style: TextStyle(
                                   fontSize: 24,
@@ -899,6 +900,7 @@ void showDebtPaymentSheet(BuildContext context, WidgetRef ref, DebtItem debt) {
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [CurrencyInputFormatter()],
                   autofocus: true,
                   decoration: const InputDecoration(
                     labelText: 'To\'lanadigan summa',
