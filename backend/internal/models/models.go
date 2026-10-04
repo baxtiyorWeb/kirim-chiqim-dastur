@@ -14,8 +14,9 @@ type User struct {
 	PasswordHash string     `json:"-"`
 	FullName     string     `json:"fullName"`
 	AvatarURL    string     `json:"avatarUrl,omitempty"`
-	Currency     string     `json:"currency"`
-	IsActive     bool       `json:"isActive"`
+	Currency       string     `json:"currency"`
+	InitialBalance int64      `json:"initialBalance"`
+	IsActive       bool       `json:"isActive"`
 	CreatedAt    time.Time  `json:"createdAt"`
 	UpdatedAt    time.Time  `json:"updatedAt"`
 	DeletedAt    *time.Time `json:"deletedAt,omitempty"`
@@ -107,12 +108,18 @@ type SavingsGoal struct {
 // DashboardSummary represents computed real-time financial stats
 type DashboardSummary struct {
 	Balance            int64            `json:"balance"`
+	InitialBalance     int64            `json:"initialBalance"`
 	TotalIncome        int64            `json:"totalIncome"`
 	TotalExpense       int64            `json:"totalExpense"`
 	TodayIncome        int64            `json:"todayIncome"`
 	TodayExpense       int64            `json:"todayExpense"`
 	MonthExpense       int64            `json:"monthExpense"`
+	TotalMonthlyLimit  int64            `json:"totalMonthlyLimit"`
 	RemainingBudget    int64            `json:"remainingBudget"`
+	TotalBorrowed      int64            `json:"totalBorrowed"`
+	RemainingBorrowed  int64            `json:"remainingBorrowed"`
+	TotalLent          int64            `json:"totalLent"`
+	RemainingLent      int64            `json:"remainingLent"`
 	CategoryExpenses   map[string]int64 `json:"categoryExpenses"`
 	RecentTransactions []Transaction    `json:"recentTransactions"`
 }

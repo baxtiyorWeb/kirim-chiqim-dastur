@@ -52,6 +52,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final repo = ref.read(financeRepositoryProvider);
+        if (!repo.isAuthenticated) {
+          resetAllFinanceProviders(ref);
+        }
+      }
+    });
     _phoneFocusNode.addListener(_onFocusOrTextChanged);
     _nameFocusNode.addListener(_onFocusOrTextChanged);
     for (final fn in _otpFocusNodes) {
@@ -156,6 +164,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     try {
       final fullPhone = _cleanFullPhone;
       _rawPhoneNumber = fullPhone;
+      // Ensure previous session is completely wiped before authenticating new number
+      await appLogout(ref);
       final repo = ref.read(financeRepositoryProvider);
       final res = await repo.sendOtp(fullPhone);
 
@@ -229,6 +239,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
         await repo.storage.setHasSeenOnboarding(true);
 
+        // Instantly push this user's authoritative PostgreSQL data into Riverpod
+        syncAllFinanceProviders(ref);
+
         setState(() {
           _isLoading = false;
           _currentStep = AuthStep.welcome;
@@ -268,6 +281,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       await repo.completeRegistration(_rawPhoneNumber, name);
       await repo.storage.setHasSeenOnboarding(true);
 
+      // Instantly push this new user's clean authoritative PostgreSQL data into Riverpod
+      syncAllFinanceProviders(ref);
+
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -287,6 +303,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   void _navigateToDashboard() {
     HapticUtil.light();
+    syncAllFinanceProviders(ref);
     context.go('/dashboard');
   }
 

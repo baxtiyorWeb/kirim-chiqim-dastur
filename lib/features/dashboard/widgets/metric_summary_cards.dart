@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/guide/guide.dart';
 import '../../../core/widgets/animated_number.dart';
 
 class MetricSummaryCards extends StatelessWidget {
@@ -24,27 +25,33 @@ class MetricSummaryCards extends StatelessWidget {
       children: [
         // Left Card: "Bu oy"
         Expanded(
-          child: _MetricCard(
-            label: AppStrings.thisMonth,
-            amount: thisMonthExpense,
-            icon: Icons.calendar_month_rounded,
-            iconColor: AppColors.primary,
-            iconBg: AppColors.primaryLight,
-            onTap: onMonthTap,
+          child: GuideTarget(
+            id: 'dashboard_month_expense',
+            child: _MetricCard(
+              label: AppStrings.thisMonth,
+              amount: thisMonthExpense,
+              icon: Icons.calendar_month_rounded,
+              iconColor: AppColors.primary,
+              iconBg: AppColors.primaryLight,
+              onTap: onMonthTap,
+            ),
           ),
         ),
 
         const SizedBox(width: AppDimensions.space12),
 
-        // Right Card: "Qolgan mablag'"
+        // Right Card: "Smeta qoldig'i"
         Expanded(
-          child: _MetricCard(
-            label: AppStrings.remainingBudget,
-            amount: remainingBudget,
-            icon: Icons.account_balance_wallet_rounded,
-            iconColor: AppColors.primary,
-            iconBg: AppColors.primaryLight,
-            onTap: onRemainingTap,
+          child: GuideTarget(
+            id: 'dashboard_smeta_qoldiq',
+            child: _MetricCard(
+              label: AppStrings.remainingBudget,
+              amount: remainingBudget,
+              icon: Icons.account_balance_wallet_rounded,
+              iconColor: AppColors.primary,
+              iconBg: AppColors.primaryLight,
+              onTap: onRemainingTap,
+            ),
           ),
         ),
       ],

@@ -48,11 +48,12 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/complete-registration", authH.CompleteRegistration)
 
 	// Protected routes helper
-	protect := middleware.Auth(cfg.JWTSecret)
+	protect := middleware.Auth(cfg.JWTSecret, repo)
 
 	// Auth & User Profile
 	mux.Handle("GET /api/v1/auth/me", protect(http.HandlerFunc(authH.Me)))
 	mux.Handle("PUT /api/v1/auth/profile", protect(http.HandlerFunc(authH.UpdateProfile)))
+	mux.Handle("PUT /api/v1/auth/initial-balance", protect(http.HandlerFunc(authH.SetInitialBalance)))
 	mux.Handle("DELETE /api/v1/auth/account", protect(http.HandlerFunc(authH.DeleteAccount)))
 
 	// Transactions

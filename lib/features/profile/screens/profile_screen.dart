@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/guide/guide.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
 import '../../../core/widgets/app_bottom_sheets.dart';
@@ -16,7 +17,9 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final balance = ref.watch(balanceProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final isPro = ref.watch(proMemberProvider);
     final colors = context.appColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -112,15 +115,15 @@ class ProfileScreen extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: colors.surfaceVariant,
+                                    color: isPro ? const Color(0xFF007A55) : colors.surfaceVariant,
                                     borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
                                   ),
                                   child: Text(
-                                    AppStrings.freePlan,
+                                    isPro ? 'Pro Intellekt ⭐' : AppStrings.freePlan,
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: colors.textSecondary,
+                                      color: isPro ? Colors.white : colors.textSecondary,
                                     ),
                                   ),
                                 ),
@@ -209,13 +212,129 @@ class ProfileScreen extends ConsumerWidget {
                       letterSpacing: -0.5,
                     ),
                   ),
+                  if (ref.watch(initialBalanceProvider) > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 14, color: colors.textTertiary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Boshlang\'ich kiritilgan: ${CurrencyFormatter.format(ref.watch(initialBalanceProvider))}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
+              ),
+            ),
+
+            const SizedBox(height: AppDimensions.space16),
+
+            // Pricing & Subscription Promo Card
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticUtil.selection();
+                  context.push('/pricing');
+                },
+                borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppDimensions.space16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [const Color(0xFF0F2B1D), const Color(0xFF13221C)]
+                          : [const Color(0xFFE8F8F0), const Color(0xFFF0FDF4)],
+                    ),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
+                    border: Border.all(
+                      color: const Color(0xFF007A55).withValues(alpha: 0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007A55),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.workspace_premium_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  isPro ? 'Pro Intellekt Faol' : 'Ta\'rif rejalari (Pro / Bepul)',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF007A55),
+                                  ),
+                                ),
+                                if (!isPro) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'PRO',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isPro
+                                  ? 'Ta\'rifni boshqarish yoki imtiyozlarni ko\'rish'
+                                  : 'Xarid hisobi va oylik tahlillar',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Color(0xFF007A55),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
 
             const SizedBox(height: AppDimensions.space20),
 
             // Group 1 Menu Options (Goals, Smeta, Debts, Reports)
+
             Container(
               decoration: BoxDecoration(
                 color: colors.card,
@@ -331,6 +450,23 @@ class ProfileScreen extends ConsumerWidget {
                   Divider(color: colors.border, height: 1, indent: 64),
                   _menuTile(
                     context: context,
+                    icon: Icons.explore_outlined,
+                    iconColor: AppColors.primary,
+                    iconBg: AppColors.primaryLight,
+                    title: 'Ilova bo‘yicha qo‘llanma',
+                    subtitle: 'Qo‘llanmani qaytadan ko‘rish',
+                    onTap: () {
+                      HapticUtil.selection();
+                      ref.read(guideControllerProvider.notifier).startTour(
+                        AppTours.firstLaunchTour,
+                        force: true,
+                      );
+                      context.go('/dashboard');
+                    },
+                  ),
+                  Divider(color: colors.border, height: 1, indent: 64),
+                  _menuTile(
+                    context: context,
                     icon: Icons.delete_forever_outlined,
                     iconColor: colors.expense,
                     iconBg: colors.expenseBg,
@@ -375,11 +511,13 @@ class ProfileScreen extends ConsumerWidget {
                     cancelLabel: 'Bekor qilish',
                     isDestructive: false,
                     icon: Icons.logout_rounded,
+                    onConfirm: () async {
+                      HapticUtil.medium();
+                      await appLogout(ref);
+                    },
                   );
-                  if (confirmed == true && context.mounted) {
-                    HapticUtil.medium();
-                    final repo = ref.read(financeRepositoryProvider);
-                    await repo.logout();
+                  if (confirmed == true) {
+                    await appLogout(ref);
                     if (context.mounted) {
                       context.go('/auth');
                     }
@@ -619,71 +757,105 @@ class ProfileScreen extends ConsumerWidget {
   void _editInitialBalanceDialog(BuildContext context, WidgetRef ref) {
     final current = ref.read(initialBalanceProvider);
     final controller = TextEditingController(
-      text: CurrencyFormatter.format(current, includeSymbol: false),
+      text: current > 0 ? CurrencyFormatter.format(current, includeSymbol: false) : '',
     );
     final colors = context.appColors;
+    bool isSubmitting = false;
 
     showAppModalBottomSheet(
       context: context,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 8,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Boshlang\'ich balansni kiritish',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: colors.textPrimary,
-                ),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 8,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Ushbu summa barcha kirim va chiqimlaringiz hisob-kitobining asosiy boshlang\'ich nuqtasi bo\'ladi.',
-                style: TextStyle(fontSize: 12, color: colors.textSecondary),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Boshlang\'ich balansni kiritish',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Ushbu summa barcha kirim va chiqimlaringiz hisob-kitobining asosiy boshlang\'ich nuqtasi bo\'ladi.',
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [CurrencyInputFormatter()],
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Boshlang\'ich summa',
+                      suffixText: 'so\'m',
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppDimensions.buttonHeight,
+                    child: ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              final amt = CurrencyFormatter.parse(controller.text);
+                              setState(() => isSubmitting = true);
+                              try {
+                                await ref.read(initialBalanceProvider.notifier).setInitialBalance(amt);
+                                HapticUtil.success();
+                                if (ctx.mounted) {
+                                  Navigator.pop(ctx);
+                                }
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Boshlang\'ich balans muvaffaqiyatli saqlandi (${CurrencyFormatter.format(amt)})'),
+                                      backgroundColor: AppColors.primary,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (ctx.mounted) {
+                                  setState(() => isSubmitting = false);
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Xatolik: $e'),
+                                      backgroundColor: colors.expense,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Boshlang\'ich summa',
-                  suffixText: 'so\'m',
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: AppDimensions.buttonHeight,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final amt = CurrencyFormatter.parse(controller.text);
-                    ref.read(initialBalanceProvider.notifier).setInitialBalance(amt);
-                    Navigator.pop(ctx);
-                    HapticUtil.success();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Boshlang\'ich balans yangilandi'),
-                        backgroundColor: AppColors.primary,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                  child: const Text('Saqlash', style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -698,15 +870,14 @@ class ProfileScreen extends ConsumerWidget {
       cancelLabel: 'Bekor qilish',
       isDestructive: true,
       icon: Icons.warning_amber_rounded,
+      onConfirm: () async {
+        await appLogout(ref);
+        HapticUtil.heavy();
+      },
     );
 
     if (confirmed == true && context.mounted) {
-      final repo = ref.read(financeRepositoryProvider);
-      await repo.clearAllData();
-      HapticUtil.heavy();
-      if (context.mounted) {
-        context.go('/onboarding');
-      }
+      context.go('/onboarding');
     }
   }
 }

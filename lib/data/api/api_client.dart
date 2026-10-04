@@ -59,8 +59,10 @@ class ApiClient {
   }) async {
     // List of candidate base URLs to attempt
     final candidates = <String>[baseUrl];
-    if (baseUrl.contains('192.168.') || baseUrl.contains('10.0.2.2')) {
+    if (!candidates.contains('http://127.0.0.1:8080')) {
       candidates.add('http://127.0.0.1:8080');
+    }
+    if (!candidates.contains('http://localhost:8080')) {
       candidates.add('http://localhost:8080');
     }
 
@@ -68,7 +70,7 @@ class ApiClient {
       final currentBase = candidates[i];
       try {
         final uri = _buildUri(currentBase, endpoint, queryParams);
-        final request = await _httpClient.openUrl(method, uri).timeout(const Duration(seconds: 12));
+        final request = await _httpClient.openUrl(method, uri).timeout(const Duration(seconds: 8));
 
         // 1. MUST set all headers BEFORE writing any body data
         _buildHeaders().forEach((k, v) => request.headers.set(k, v));
@@ -80,7 +82,7 @@ class ApiClient {
           request.add(bodyBytes);
         }
 
-        final response = await request.close().timeout(const Duration(seconds: 12));
+        final response = await request.close().timeout(const Duration(seconds: 8));
         final result = await _processResponse(response);
         // If successful and on fallback, update baseUrl
         if (currentBase != baseUrl) {
@@ -90,6 +92,9 @@ class ApiClient {
       } on SocketException {
         continue; // Try next candidate
       } on TimeoutException {
+        if (i < candidates.length - 1) {
+          continue; // Try next candidate
+        }
         throw ApiException('Server javob berish vaqti tugadi.');
       }
     }

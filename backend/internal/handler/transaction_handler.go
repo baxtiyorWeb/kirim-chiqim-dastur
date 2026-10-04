@@ -152,7 +152,7 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	transactions, err := h.repo.ListTransactions(r.Context(), userID, filter)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to retrieve transactions")
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve transactions: "+err.Error())
 		return
 	}
 

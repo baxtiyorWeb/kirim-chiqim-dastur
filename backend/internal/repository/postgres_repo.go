@@ -26,8 +26,8 @@ func NewPostgresRepository(db *sql.DB) *PostgresRepository {
 // User / Auth
 func (r *PostgresRepository) CreateUser(ctx context.Context, u *models.User) error {
 	query := `
-		INSERT INTO users (id, email, phone_number, password_hash, full_name, avatar_url, currency, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO users (id, email, phone_number, password_hash, full_name, avatar_url, currency, initial_balance, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	var emailVal, phoneVal, avatarVal *string
 	if strings.TrimSpace(u.Email) != "" {
@@ -44,21 +44,31 @@ func (r *PostgresRepository) CreateUser(ctx context.Context, u *models.User) err
 	}
 
 	_, err := r.db.ExecContext(ctx, query,
-		u.ID, emailVal, phoneVal, u.PasswordHash, u.FullName, avatarVal, u.Currency, u.IsActive, u.CreatedAt, u.UpdatedAt,
+		u.ID, emailVal, phoneVal, u.PasswordHash, u.FullName, avatarVal, u.Currency, u.InitialBalance, u.IsActive, u.CreatedAt, u.UpdatedAt,
 	)
+	return err
+}
+
+func (r *PostgresRepository) EnsureUserExists(ctx context.Context, userID uuid.UUID, phone, fullName string) error {
+	query := `
+		INSERT INTO users (id, phone_number, full_name, password_hash, currency, is_active, created_at, updated_at)
+		VALUES ($1, NULLIF($2, ''), COALESCE(NULLIF($3, ''), 'Foydalanuvchi'), '', 'UZS', true, NOW(), NOW())
+		ON CONFLICT (id) DO NOTHING
+	`
+	_, err := r.db.ExecContext(ctx, query, userID, phone, fullName)
 	return err
 }
 
 func (r *PostgresRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
-		SELECT id, email, phone_number, password_hash, full_name, avatar_url, currency, is_active, created_at, updated_at
+		SELECT id, email, phone_number, password_hash, full_name, avatar_url, currency, COALESCE(initial_balance, 0), is_active, created_at, updated_at
 		FROM users
 		WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL
 	`
 	u := &models.User{}
 	var emailVal, phone, avatar sql.NullString
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
-		&u.ID, &emailVal, &phone, &u.PasswordHash, &u.FullName, &avatar, &u.Currency, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		&u.ID, &emailVal, &phone, &u.PasswordHash, &u.FullName, &avatar, &u.Currency, &u.InitialBalance, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -88,7 +98,7 @@ func (r *PostgresRepository) GetUserByPhone(ctx context.Context, phone string) (
 	}, phone)
 
 	query := `
-		SELECT id, email, phone_number, password_hash, full_name, avatar_url, currency, is_active, created_at, updated_at
+		SELECT id, email, phone_number, password_hash, full_name, avatar_url, currency, COALESCE(initial_balance, 0), is_active, created_at, updated_at
 		FROM users
 		WHERE (phone_number = $1 OR regexp_replace(COALESCE(phone_number, ''), '[^0-9]', '', 'g') = $2)
 		  AND deleted_at IS NULL
@@ -98,7 +108,7 @@ func (r *PostgresRepository) GetUserByPhone(ctx context.Context, phone string) (
 	u := &models.User{}
 	var emailVal, phoneVal, avatar sql.NullString
 	err := r.db.QueryRowContext(ctx, query, phone, digits).Scan(
-		&u.ID, &emailVal, &phoneVal, &u.PasswordHash, &u.FullName, &avatar, &u.Currency, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		&u.ID, &emailVal, &phoneVal, &u.PasswordHash, &u.FullName, &avatar, &u.Currency, &u.InitialBalance, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -120,14 +130,14 @@ func (r *PostgresRepository) GetUserByPhone(ctx context.Context, phone string) (
 
 func (r *PostgresRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	query := `
-		SELECT id, email, phone_number, password_hash, full_name, avatar_url, currency, is_active, created_at, updated_at
+		SELECT id, email, phone_number, password_hash, full_name, avatar_url, currency, COALESCE(initial_balance, 0), is_active, created_at, updated_at
 		FROM users
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 	u := &models.User{}
 	var emailVal, phone, avatar sql.NullString
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&u.ID, &emailVal, &phone, &u.PasswordHash, &u.FullName, &avatar, &u.Currency, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		&u.ID, &emailVal, &phone, &u.PasswordHash, &u.FullName, &avatar, &u.Currency, &u.InitialBalance, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -164,6 +174,23 @@ func (r *PostgresRepository) UpdateUser(ctx context.Context, u *models.User) err
 	}
 	_, err := r.db.ExecContext(ctx, query, u.FullName, emailVal, avatarVal, u.ID)
 	return err
+}
+
+func (r *PostgresRepository) UpdateInitialBalance(ctx context.Context, userID uuid.UUID, amount int64) error {
+	query := `
+		UPDATE users
+		SET initial_balance = $1, updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL
+	`
+	res, err := r.db.ExecContext(ctx, query, amount, userID)
+	if err != nil {
+		return err
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (r *PostgresRepository) DeleteUser(ctx context.Context, id uuid.UUID) error {
@@ -433,8 +460,9 @@ func (r *PostgresRepository) GetDebtByID(ctx context.Context, userID, id uuid.UU
 	`
 	d := &models.Debt{}
 	var phone, note sql.NullString
+	var dueDate sql.NullTime
 	err := r.db.QueryRowContext(ctx, query, id, userID).Scan(
-		&d.ID, &d.UserID, &d.PersonName, &phone, &d.Amount, &d.PaidAmount, &d.DebtType, &d.Status, &d.DueDate, &note, &d.CreatedAt, &d.UpdatedAt,
+		&d.ID, &d.UserID, &d.PersonName, &phone, &d.Amount, &d.PaidAmount, &d.DebtType, &d.Status, &dueDate, &note, &d.CreatedAt, &d.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -447,6 +475,9 @@ func (r *PostgresRepository) GetDebtByID(ctx context.Context, userID, id uuid.UU
 	}
 	if note.Valid {
 		d.Note = note.String
+	}
+	if dueDate.Valid {
+		d.DueDate = &dueDate.Time
 	}
 
 	// Fetch repayments
@@ -498,8 +529,9 @@ func (r *PostgresRepository) ListDebts(ctx context.Context, userID uuid.UUID, de
 	for rows.Next() {
 		var d models.Debt
 		var phone, note sql.NullString
+		var dueDate sql.NullTime
 		if err := rows.Scan(
-			&d.ID, &d.UserID, &d.PersonName, &phone, &d.Amount, &d.PaidAmount, &d.DebtType, &d.Status, &d.DueDate, &note, &d.CreatedAt, &d.UpdatedAt,
+			&d.ID, &d.UserID, &d.PersonName, &phone, &d.Amount, &d.PaidAmount, &d.DebtType, &d.Status, &dueDate, &note, &d.CreatedAt, &d.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -508,6 +540,9 @@ func (r *PostgresRepository) ListDebts(ctx context.Context, userID uuid.UUID, de
 		}
 		if note.Valid {
 			d.Note = note.String
+		}
+		if dueDate.Valid {
+			d.DueDate = &dueDate.Time
 		}
 		list = append(list, d)
 	}
@@ -609,13 +644,20 @@ func (r *PostgresRepository) GetGoalByID(ctx context.Context, userID, id uuid.UU
 		WHERE id = $1 AND user_id = $2
 	`
 	g := &models.SavingsGoal{}
+	var deadline sql.NullTime
 	err := r.db.QueryRowContext(ctx, query, id, userID).Scan(
-		&g.ID, &g.UserID, &g.Title, &g.TargetAmount, &g.CurrentAmount, &g.Deadline, &g.Emoji, &g.IsCompleted, &g.CreatedAt, &g.UpdatedAt,
+		&g.ID, &g.UserID, &g.Title, &g.TargetAmount, &g.CurrentAmount, &deadline, &g.Emoji, &g.IsCompleted, &g.CreatedAt, &g.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return g, err
+	if err != nil {
+		return nil, err
+	}
+	if deadline.Valid {
+		g.Deadline = &deadline.Time
+	}
+	return g, nil
 }
 
 func (r *PostgresRepository) ListGoals(ctx context.Context, userID uuid.UUID) ([]models.SavingsGoal, error) {
@@ -634,10 +676,14 @@ func (r *PostgresRepository) ListGoals(ctx context.Context, userID uuid.UUID) ([
 	var list []models.SavingsGoal
 	for rows.Next() {
 		var g models.SavingsGoal
+		var deadline sql.NullTime
 		if err := rows.Scan(
-			&g.ID, &g.UserID, &g.Title, &g.TargetAmount, &g.CurrentAmount, &g.Deadline, &g.Emoji, &g.IsCompleted, &g.CreatedAt, &g.UpdatedAt,
+			&g.ID, &g.UserID, &g.Title, &g.TargetAmount, &g.CurrentAmount, &deadline, &g.Emoji, &g.IsCompleted, &g.CreatedAt, &g.UpdatedAt,
 		); err != nil {
 			return nil, err
+		}
+		if deadline.Valid {
+			g.Deadline = &deadline.Time
 		}
 		list = append(list, g)
 	}
@@ -728,7 +774,10 @@ func (r *PostgresRepository) GetDashboardSummary(ctx context.Context, userID uui
 	_ = r.db.QueryRowContext(ctx, qTotals, userID, todayStr, monthStr).Scan(
 		&summary.TotalIncome, &summary.TotalExpense, &summary.TodayIncome, &summary.TodayExpense, &summary.MonthExpense,
 	)
-	summary.Balance = summary.TotalIncome - summary.TotalExpense
+	var initialBalance int64
+	_ = r.db.QueryRowContext(ctx, `SELECT COALESCE(initial_balance, 0) FROM users WHERE id = $1 AND deleted_at IS NULL`, userID).Scan(&initialBalance)
+	summary.InitialBalance = initialBalance
+	summary.Balance = summary.InitialBalance + summary.TotalIncome - summary.TotalExpense
 
 	// Monthly budget remaining
 	budget, _ := r.GetBudgetByMonth(ctx, userID, monthStr)
@@ -737,10 +786,29 @@ func (r *PostgresRepository) GetDashboardSummary(ctx context.Context, userID uui
 		if rem < 0 {
 			rem = 0
 		}
+		summary.TotalMonthlyLimit = budget.TotalMonthlyLimit
 		summary.RemainingBudget = rem
 	} else {
+		summary.TotalMonthlyLimit = 0
 		summary.RemainingBudget = 0
 	}
+
+	// Debts summary metrics
+	qDebts := `
+		SELECT
+			COALESCE(SUM(CASE WHEN debt_type = 'borrowed' THEN amount ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN debt_type = 'borrowed' THEN GREATEST(amount - paid_amount, 0) ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN debt_type = 'lent' THEN amount ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN debt_type = 'lent' THEN GREATEST(amount - paid_amount, 0) ELSE 0 END), 0)
+		FROM debts
+		WHERE user_id = $1 AND deleted_at IS NULL AND status != 'returned'
+	`
+	_ = r.db.QueryRowContext(ctx, qDebts, userID).Scan(
+		&summary.TotalBorrowed,
+		&summary.RemainingBorrowed,
+		&summary.TotalLent,
+		&summary.RemainingLent,
+	)
 
 	// Category expense breakdown for the month
 	qCat := `

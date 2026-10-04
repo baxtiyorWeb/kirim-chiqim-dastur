@@ -30,7 +30,7 @@ func setupTestApp() (*http.ServeMux, repository.Repository) {
 	mux.HandleFunc("POST /api/v1/auth/register", authH.Register)
 	mux.HandleFunc("POST /api/v1/auth/login", authH.Login)
 
-	protect := middleware.Auth(testSecret)
+	protect := middleware.Auth(testSecret, repo)
 	mux.Handle("GET /api/v1/auth/me", protect(http.HandlerFunc(authH.Me)))
 	mux.Handle("GET /api/v1/transactions", protect(http.HandlerFunc(txH.List)))
 	mux.Handle("POST /api/v1/transactions", protect(http.HandlerFunc(txH.Create)))

@@ -30,6 +30,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   late String _selectedCategoryId;
   late DateTime _selectedDate;
   late String _paymentMethod;
+  bool _isLoading = false;
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
 
@@ -93,7 +94,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
     }
   }
 
-  void _saveTransaction() {
+  Future<void> _saveTransaction() async {
     final colors = context.appColors;
     if (_amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -106,49 +107,67 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       return;
     }
 
+    setState(() => _isLoading = true);
     HapticUtil.success();
     final selectedCategory = CategoryItem.getById(_selectedCategoryId);
     final note = _noteController.text.trim();
     final title = note.isNotEmpty ? note : selectedCategory.name;
 
-    if (widget.existingItem != null) {
-      final updated = widget.existingItem!.copyWith(
-        title: title,
-        amount: _amount,
-        categoryId: _selectedCategoryId,
-        type: _isExpense ? TransactionType.expense : TransactionType.income,
-        dateTime: _selectedDate,
-        note: note.isNotEmpty ? note : null,
-        paymentMethod: _paymentMethod,
-      );
-      ref.read(transactionsProvider.notifier).updateTransaction(updated);
-    } else {
-      final newTransaction = TransactionItem(
-        id: const Uuid().v4(),
-        title: title,
-        amount: _amount,
-        categoryId: _selectedCategoryId,
-        type: _isExpense ? TransactionType.expense : TransactionType.income,
-        dateTime: _selectedDate,
-        note: note.isNotEmpty ? note : null,
-        paymentMethod: _paymentMethod,
-      );
-      ref.read(transactionsProvider.notifier).addTransaction(newTransaction);
+    try {
+      if (widget.existingItem != null) {
+        final updated = widget.existingItem!.copyWith(
+          title: title,
+          amount: _amount,
+          categoryId: _selectedCategoryId,
+          type: _isExpense ? TransactionType.expense : TransactionType.income,
+          dateTime: _selectedDate,
+          note: note.isNotEmpty ? note : null,
+          paymentMethod: _paymentMethod,
+        );
+        await ref.read(transactionsProvider.notifier).updateTransaction(updated);
+      } else {
+        final newTransaction = TransactionItem(
+          id: const Uuid().v4(),
+          title: title,
+          amount: _amount,
+          categoryId: _selectedCategoryId,
+          type: _isExpense ? TransactionType.expense : TransactionType.income,
+          dateTime: _selectedDate,
+          note: note.isNotEmpty ? note : null,
+          paymentMethod: _paymentMethod,
+        );
+        await ref.read(transactionsProvider.notifier).addTransaction(newTransaction);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.existingItem != null
+                  ? 'Tranzaksiya muvaffaqiyatli yangilandi'
+                  : (_isExpense ? 'Xarajat muvaffaqiyatli saqlandi' : 'Daromad saqlandi'),
+            ),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Xatolik: $e'),
+            backgroundColor: colors.expense,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.existingItem != null
-              ? 'Tranzaksiya muvaffaqiyatli yangilandi'
-              : (_isExpense ? 'Xarajat muvaffaqiyatli saqlandi' : 'Daromad saqlandi'),
-        ),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-
-    context.pop();
   }
 
   @override
@@ -522,7 +541,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
               width: double.infinity,
               height: AppDimensions.buttonHeight,
               child: ElevatedButton(
-                onPressed: _saveTransaction,
+                onPressed: _isLoading ? null : _saveTransaction,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -530,13 +549,22 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                     borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
                   ),
                 ),
-                child: Text(
-                  widget.existingItem != null ? 'Saqlash' : AppStrings.save,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : Text(
+                        widget.existingItem != null ? 'Saqlash' : AppStrings.save,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
               ),
             ),
 

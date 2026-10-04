@@ -5,6 +5,7 @@ class UserProfile {
   final String fullName;
   final String? avatarUrl;
   final String currency;
+  final int initialBalance;
 
   const UserProfile({
     required this.id,
@@ -13,6 +14,7 @@ class UserProfile {
     required this.fullName,
     this.avatarUrl,
     this.currency = 'UZS',
+    this.initialBalance = 0,
   });
 
   String? get phone => phoneNumber;
@@ -22,6 +24,7 @@ class UserProfile {
       id: '',
       fullName: 'Foydalanuvchi',
       currency: 'UZS',
+      initialBalance: 0,
     );
   }
 
@@ -33,6 +36,7 @@ class UserProfile {
       fullName: json['fullName']?.toString() ?? 'Foydalanuvchi',
       avatarUrl: json['avatarUrl']?.toString(),
       currency: json['currency']?.toString() ?? 'UZS',
+      initialBalance: (json['initialBalance'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -44,6 +48,7 @@ class UserProfile {
       'fullName': fullName,
       'avatarUrl': avatarUrl,
       'currency': currency,
+      'initialBalance': initialBalance,
     };
   }
 
@@ -54,6 +59,7 @@ class UserProfile {
     String? fullName,
     String? avatarUrl,
     String? currency,
+    int? initialBalance,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -62,6 +68,7 @@ class UserProfile {
       fullName: fullName ?? this.fullName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       currency: currency ?? this.currency,
+      initialBalance: initialBalance ?? this.initialBalance,
     );
   }
 }

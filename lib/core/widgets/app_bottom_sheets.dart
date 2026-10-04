@@ -88,98 +88,134 @@ Future<bool?> showConfirmSheet({
   String cancelLabel = 'Bekor qilish',
   bool isDestructive = false,
   IconData icon = Icons.info_outline_rounded,
+  Future<void> Function()? onConfirm,
 }) {
   return showAppModalBottomSheet<bool>(
     context: context,
     builder: (ctx) {
       final colors = ctx.appColors;
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: isDestructive ? colors.expenseBg : AppColors.primaryLight,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: isDestructive ? colors.expense : AppColors.primary,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: colors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: colors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
+      bool isConfirming = false;
+      return StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: colors.border),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
-                      ),
-                    ),
-                    child: Text(
-                      cancelLabel,
-                      style: TextStyle(
-                        color: colors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: isDestructive ? colors.expenseBg : AppColors.primaryLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isDestructive ? colors.expense : AppColors.primary,
+                    size: 28,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      HapticUtil.medium();
-                      Navigator.pop(ctx, true);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDestructive ? colors.expense : AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
-                      ),
-                    ),
-                    child: Text(
-                      confirmLabel,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: isConfirming ? null : () => Navigator.pop(ctx, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: colors.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
+                          ),
+                        ),
+                        child: Text(
+                          cancelLabel,
+                          style: TextStyle(
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isConfirming
+                            ? null
+                            : () async {
+                                HapticUtil.medium();
+                                if (onConfirm != null) {
+                                  setSheetState(() => isConfirming = true);
+                                  try {
+                                    await onConfirm();
+                                    if (ctx.mounted) Navigator.pop(ctx, true);
+                                  } catch (e) {
+                                    if (ctx.mounted) {
+                                      setSheetState(() => isConfirming = false);
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Xatolik: $e'),
+                                          backgroundColor: colors.expense,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } else {
+                                  Navigator.pop(ctx, true);
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDestructive ? colors.expense : AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
+                          ),
+                        ),
+                        child: isConfirming
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.2,
+                                ),
+                              )
+                            : Text(
+                                confirmLabel,
+                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
               ],
             ),
-            const SizedBox(height: 12),
-          ],
-        ),
+          );
+        },
       );
     },
   );
@@ -396,18 +432,192 @@ void showExportBottomSheet(BuildContext context, WidgetRef ref) {
   );
 }
 
+/// Quick Action: Choice between Kirim and Chiqim before opening transaction sheet
+Future<void> showTransactionTypePickerSheet(
+  BuildContext context,
+  WidgetRef ref,
+) {
+  HapticUtil.selection();
+  final colors = context.appColors;
+
+  return showAppModalBottomSheet(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Amal turini tanlang',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close_rounded, color: colors.textSecondary, size: 20),
+                  onPressed: () => Navigator.pop(sheetContext),
+                  splashRadius: 20,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                // 1. Chiqim Card
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        HapticUtil.medium();
+                        Navigator.pop(sheetContext);
+                        showAddEditTransactionSheet(context, ref, initialIsExpense: true);
+                      },
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: colors.expenseBg.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                          border: Border.all(
+                            color: colors.expense.withValues(alpha: 0.35),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: colors.expenseBg,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.arrow_upward_rounded,
+                                color: colors.expense,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Chiqim',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Xarajat va to\'lovlar',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // 2. Kirim Card
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        HapticUtil.medium();
+                        Navigator.pop(sheetContext);
+                        showAddEditTransactionSheet(context, ref, initialIsExpense: false);
+                      },
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: colors.incomeBg.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                          border: Border.all(
+                            color: colors.income.withValues(alpha: 0.35),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: colors.incomeBg,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.arrow_downward_rounded,
+                                color: colors.income,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Kirim',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Maosh va tushumlar',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 /// Interactive Add/Edit Transaction Bottom Sheet
 void showAddEditTransactionSheet(
   BuildContext context,
   WidgetRef ref, {
   TransactionItem? existingItem,
+  bool initialIsExpense = true,
 }) {
   final isEditing = existingItem != null;
   final colors = context.appColors;
+  bool isSubmitting = false;
 
-  bool isExpense = isEditing ? existingItem.isExpense : true;
+  bool isExpense = isEditing ? existingItem.isExpense : initialIsExpense;
   int amount = isEditing ? existingItem.amount : 0;
-  String selectedCategoryId = isEditing ? existingItem.categoryId : 'food';
+  String selectedCategoryId = isEditing
+      ? existingItem.categoryId
+      : (initialIsExpense ? 'food' : 'salary');
   DateTime selectedDate = isEditing ? existingItem.dateTime : DateTime.now();
   String paymentMethod = isEditing ? existingItem.paymentMethod : 'cash';
 
@@ -448,14 +658,14 @@ void showAddEditTransactionSheet(
                       Text(
                         isEditing
                             ? (isExpense ? 'Xarajatni tahrirlash' : 'Daromadni tahrirlash')
-                            : (isExpense ? AppStrings.addExpense : AppStrings.addIncome),
+                            : (isExpense ? 'Chiqim qo\'shish' : 'Kirim qo\'shish'),
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: colors.textPrimary,
                         ),
                       ),
-                      // Toggle pills
+                      // Toggle pills (allows user to switch type freely in modal)
                       Container(
                         padding: const EdgeInsets.all(3),
                         decoration: BoxDecoration(
@@ -522,27 +732,32 @@ void showAddEditTransactionSheet(
 
                   // Amount Input Card
                   Container(
-                    padding: const EdgeInsets.all(AppDimensions.space16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: colors.surfaceVariant,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                      border: Border.all(color: colors.border),
+                      color: colors.surfaceVariant.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                      border: Border.all(
+                        color: isExpense
+                            ? colors.expense.withValues(alpha: 0.3)
+                            : colors.income.withValues(alpha: 0.3),
+                        width: 1.2,
+                      ),
                     ),
                     child: Column(
                       children: [
                         Row(
                           children: [
                             Container(
-                              width: 42,
-                              height: 42,
+                              width: 38,
+                              height: 38,
                               decoration: BoxDecoration(
                                 color: isExpense ? colors.expenseBg : colors.incomeBg,
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                isExpense ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                isExpense ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
                                 color: isExpense ? colors.expense : colors.income,
-                                size: 22,
+                                size: 20,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -553,10 +768,10 @@ void showAddEditTransactionSheet(
                                 inputFormatters: [CurrencyInputFormatter()],
                                 autofocus: !isEditing,
                                 style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
                                   color: colors.textPrimary,
-                                  letterSpacing: -0.5,
+                                  letterSpacing: -0.3,
                                 ),
                                 onChanged: (val) {
                                   amount = CurrencyFormatter.parse(val);
@@ -565,7 +780,7 @@ void showAddEditTransactionSheet(
                                   hintText: '0',
                                   suffixText: ' so\'m',
                                   suffixStyle: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: colors.textSecondary,
                                   ),
@@ -766,82 +981,95 @@ void showAddEditTransactionSheet(
                     width: double.infinity,
                     height: AppDimensions.buttonHeight,
                     child: ElevatedButton(
-                      onPressed: () async {
-                        if (amount <= 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Iltimos, to\'g\'ri summani kiriting'),
-                              backgroundColor: colors.expense,
-                              behavior: SnackBarBehavior.floating,
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              if (amount <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Iltimos, to\'g\'ri summani kiriting'),
+                                    backgroundColor: colors.expense,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              setSheetState(() => isSubmitting = true);
+                              HapticUtil.success();
+                              final catName = CategoryItem.getById(selectedCategoryId).name;
+                              final customTitle = titleController.text.trim();
+                              final finalTitle = customTitle.isNotEmpty ? customTitle : catName;
+                              final note = noteController.text.trim();
+
+                              try {
+                                if (isEditing) {
+                                  final updated = existingItem.copyWith(
+                                    title: finalTitle,
+                                    amount: amount,
+                                    categoryId: selectedCategoryId,
+                                    type: isExpense ? TransactionType.expense : TransactionType.income,
+                                    dateTime: selectedDate,
+                                    note: note.isNotEmpty ? note : null,
+                                    paymentMethod: paymentMethod,
+                                  );
+                                  await ref.read(transactionsProvider.notifier).updateTransaction(updated);
+                                } else {
+                                  final newItem = TransactionItem(
+                                    id: const Uuid().v4(),
+                                    title: finalTitle,
+                                    amount: amount,
+                                    categoryId: selectedCategoryId,
+                                    type: isExpense ? TransactionType.expense : TransactionType.income,
+                                    dateTime: selectedDate,
+                                    note: note.isNotEmpty ? note : null,
+                                    paymentMethod: paymentMethod,
+                                  );
+                                  await ref.read(transactionsProvider.notifier).addTransaction(newItem);
+                                }
+
+                                if (ctx.mounted) {
+                                  Navigator.pop(ctx);
+                                }
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        isEditing
+                                            ? 'Tranzaksiya yangilandi'
+                                            : (isExpense ? 'Xarajat saqlandi' : 'Daromad saqlandi'),
+                                      ),
+                                      backgroundColor: AppColors.primary,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (ctx.mounted) {
+                                  setSheetState(() => isSubmitting = false);
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Xatolik: $e'),
+                                      backgroundColor: colors.expense,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : Text(
+                              isEditing ? 'Saqlash' : AppStrings.save,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                             ),
-                          );
-                          return;
-                        }
-
-                        HapticUtil.success();
-                        final catName = CategoryItem.getById(selectedCategoryId).name;
-                        final customTitle = titleController.text.trim();
-                        final finalTitle = customTitle.isNotEmpty ? customTitle : catName;
-                        final note = noteController.text.trim();
-
-                        try {
-                          if (isEditing) {
-                            final updated = existingItem.copyWith(
-                              title: finalTitle,
-                              amount: amount,
-                              categoryId: selectedCategoryId,
-                              type: isExpense ? TransactionType.expense : TransactionType.income,
-                              dateTime: selectedDate,
-                              note: note.isNotEmpty ? note : null,
-                              paymentMethod: paymentMethod,
-                            );
-                            await ref.read(transactionsProvider.notifier).updateTransaction(updated);
-                          } else {
-                            final newItem = TransactionItem(
-                              id: const Uuid().v4(),
-                              title: finalTitle,
-                              amount: amount,
-                              categoryId: selectedCategoryId,
-                              type: isExpense ? TransactionType.expense : TransactionType.income,
-                              dateTime: selectedDate,
-                              note: note.isNotEmpty ? note : null,
-                              paymentMethod: paymentMethod,
-                            );
-                            await ref.read(transactionsProvider.notifier).addTransaction(newItem);
-                          }
-
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                          }
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  isEditing
-                                      ? 'Tranzaksiya yangilandi'
-                                      : (isExpense ? 'Xarajat saqlandi' : 'Daromad saqlandi'),
-                                ),
-                                backgroundColor: AppColors.primary,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text('Xatolik: $e'),
-                                backgroundColor: colors.expense,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      child: Text(
-                        isEditing ? 'Saqlash' : AppStrings.save,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                      ),
                     ),
                   ),
                 ],
@@ -861,6 +1089,7 @@ void showDebtPaymentSheet(BuildContext context, WidgetRef ref, DebtItem debt) {
   );
   final noteController = TextEditingController();
   bool linkToTransactions = true;
+  bool isSubmitting = false;
   final colors = context.appColors;
 
   showAppModalBottomSheet(
@@ -933,45 +1162,58 @@ void showDebtPaymentSheet(BuildContext context, WidgetRef ref, DebtItem debt) {
                   width: double.infinity,
                   height: AppDimensions.buttonHeight,
                   child: ElevatedButton(
-                    onPressed: () async {
-                      final amt = CurrencyFormatter.parse(amountController.text);
-                      if (amt > 0) {
-                        try {
-                          await ref.read(debtsProvider.notifier).recordPayment(
-                                debtId: debt.id,
-                                amount: amt,
-                                note: noteController.text.trim().isNotEmpty
-                                    ? noteController.text.trim()
-                                    : null,
-                                linkTransaction: linkToTransactions,
-                              );
-                          HapticUtil.success();
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                          }
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Qarz to\'lovi muvaffaqiyatli qayd etildi'),
-                                backgroundColor: AppColors.primary,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text('Xatolik: $e'),
-                                backgroundColor: colors.expense,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      }
-                    },
-                    child: const Text('To\'lovni kiritish', style: TextStyle(fontWeight: FontWeight.w700)),
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final amt = CurrencyFormatter.parse(amountController.text);
+                            if (amt > 0) {
+                              setState(() => isSubmitting = true);
+                              try {
+                                await ref.read(debtsProvider.notifier).recordPayment(
+                                      debtId: debt.id,
+                                      amount: amt,
+                                      note: noteController.text.trim().isNotEmpty
+                                          ? noteController.text.trim()
+                                          : null,
+                                      linkTransaction: linkToTransactions,
+                                    );
+                                HapticUtil.success();
+                                if (ctx.mounted) {
+                                  Navigator.pop(ctx);
+                                }
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Qarz to\'lovi muvaffaqiyatli qayd etildi'),
+                                      backgroundColor: AppColors.primary,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (ctx.mounted) {
+                                  setState(() => isSubmitting = false);
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Xatolik: $e'),
+                                      backgroundColor: colors.expense,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
+                            }
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Text('To\'lovni kiritish', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
               ],

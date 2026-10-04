@@ -201,18 +201,18 @@ class GoalsScreen extends ConsumerWidget {
                                       confirmLabel: 'O\'chirish',
                                       isDestructive: true,
                                       icon: Icons.delete_outline_rounded,
+                                      onConfirm: () async {
+                                        HapticUtil.medium();
+                                        await ref.read(goalsProvider.notifier).deleteGoal(goal.id);
+                                      },
                                     );
-                                    if (confirm == true) {
-                                      HapticUtil.medium();
-                                      await ref.read(goalsProvider.notifier).deleteGoal(goal.id);
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Maqsad o\'chirildi'),
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
-                                      }
+                                    if (confirm == true && context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Maqsad o\'chirildi'),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
                                     }
                                   },
                                 ),
@@ -241,70 +241,88 @@ class GoalsScreen extends ConsumerWidget {
     showAppModalBottomSheet(
       context: context,
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${goal.title} ga mablag\' qo\'shish',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: colors.textPrimary,
-                ),
+        bool isSubmitting = false;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${goal.title} ga mablag\' qo\'shish',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [CurrencyInputFormatter()],
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Qo\'shiladigan summa',
+                      suffixText: 'so\'m',
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppDimensions.buttonHeight,
+                    child: ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              final amt = CurrencyFormatter.parse(controller.text);
+                              if (amt > 0) {
+                                setModalState(() => isSubmitting = true);
+                                try {
+                                  await ref.read(goalsProvider.notifier).addDeposit(goal.id, amt);
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  HapticUtil.success();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Jamg\'armaga muvaffaqiyatli qo\'shildi'),
+                                        backgroundColor: AppColors.primary,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (ctx.mounted) {
+                                    setModalState(() => isSubmitting = false);
+                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Xatolik: $e'),
+                                        backgroundColor: colors.expense,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text('Qo\'shish', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Qo\'shiladigan summa',
-                  suffixText: 'so\'m',
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: AppDimensions.buttonHeight,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final amt = CurrencyFormatter.parse(controller.text);
-                    if (amt > 0) {
-                      try {
-                        await ref.read(goalsProvider.notifier).addDeposit(goal.id, amt);
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        HapticUtil.success();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Jamg\'armaga muvaffaqiyatli qo\'shildi'),
-                              backgroundColor: AppColors.primary,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(
-                              content: Text('Xatolik: $e'),
-                              backgroundColor: colors.expense,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  },
-                  child: const Text('Qo\'shish', style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -318,79 +336,97 @@ class GoalsScreen extends ConsumerWidget {
     showAppModalBottomSheet(
       context: context,
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Yangi jamg\'arma maqsadi',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: colors.textPrimary,
-                ),
+        bool isSubmitting = false;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Yangi jamg\'arma maqsadi',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(labelText: 'Maqsad nomi (Masalan: Avtomobil)'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [CurrencyInputFormatter()],
+                    decoration: const InputDecoration(labelText: 'Kerakli summa (so\'m)', suffixText: 'so\'m'),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppDimensions.buttonHeight,
+                    child: ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              final title = titleController.text.trim();
+                              final amt = CurrencyFormatter.parse(amountController.text);
+                              if (title.isNotEmpty && amt > 0) {
+                                setModalState(() => isSubmitting = true);
+                                final newGoal = SavingsGoal(
+                                  id: const Uuid().v4(),
+                                  title: title,
+                                  targetAmount: amt,
+                                  currentAmount: 0,
+                                  emoji: '🚀',
+                                );
+                                try {
+                                  await ref.read(goalsProvider.notifier).addGoal(newGoal);
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  HapticUtil.success();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Yangi maqsad yaratildi'),
+                                        backgroundColor: AppColors.primary,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (ctx.mounted) {
+                                    setModalState(() => isSubmitting = false);
+                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Xatolik: $e'),
+                                        backgroundColor: colors.expense,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text('Yaratish', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(labelText: 'Maqsad nomi (Masalan: Avtomobil)'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
-                decoration: const InputDecoration(labelText: 'Kerakli summa (so\'m)', suffixText: 'so\'m'),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: AppDimensions.buttonHeight,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final title = titleController.text.trim();
-                    final amt = CurrencyFormatter.parse(amountController.text);
-                    if (title.isNotEmpty && amt > 0) {
-                      final newGoal = SavingsGoal(
-                        id: const Uuid().v4(),
-                        title: title,
-                        targetAmount: amt,
-                        currentAmount: 0,
-                        emoji: '🚀',
-                      );
-                      try {
-                        await ref.read(goalsProvider.notifier).addGoal(newGoal);
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        HapticUtil.success();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Yangi maqsad yaratildi'),
-                              backgroundColor: AppColors.primary,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(
-                              content: Text('Xatolik: $e'),
-                              backgroundColor: colors.expense,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      }
-                    }
-                  },
-                  child: const Text('Yaratish', style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

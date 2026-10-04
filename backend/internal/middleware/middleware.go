@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"kirim-chiqim-backend/internal/repository"
 )
 
 type contextKey string
@@ -85,8 +86,8 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	}
 }
 
-// Auth verifies JWT Bearer token and injects UserID into request context
-func Auth(jwtSecret string) func(http.Handler) http.Handler {
+// Auth verifies JWT Bearer token, auto-heals user record in DB, and injects UserID into request context
+func Auth(jwtSecret string, repo repository.Repository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -142,6 +143,10 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 				w.WriteHeader(http.StatusUnauthorized)
 				_ = json.NewEncoder(w).Encode(map[string]string{"error": "Malformed user ID"})
 				return
+			}
+
+			if repo != nil {
+				_ = repo.EnsureUserExists(r.Context(), uid, "", "Foydalanuvchi")
 			}
 
 			ctx := context.WithValue(r.Context(), UserIDKey, uid)

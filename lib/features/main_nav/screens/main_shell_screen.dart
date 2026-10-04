@@ -25,8 +25,8 @@ class MainShellScreen extends ConsumerWidget {
           );
         },
         onAddPressed: () {
-          // Native Material 3 Bottom Sheet for fast transaction creation
-          showAddEditTransactionSheet(context, ref);
+          // Open selection sheet between Kirim and Chiqim
+          showTransactionTypePickerSheet(context, ref);
         },
       ),
     );

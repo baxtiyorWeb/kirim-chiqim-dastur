@@ -46,7 +46,7 @@ func (h *BudgetHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	budget, err := h.repo.GetBudgetByMonth(r.Context(), userID, yearMonth)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to retrieve budget")
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve budget: "+err.Error())
 		return
 	}
 

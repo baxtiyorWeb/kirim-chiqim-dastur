@@ -13,7 +13,7 @@ class AppStrings {
   static const String dashboardSubtitle = "Bugungi xarajatlaringiz nazoratda";
   static const String totalExpenses = "Jami xarajatlar";
   static const String thisMonth = "Bu oy";
-  static const String remainingBudget = "Qolgan mablag'";
+  static const String remainingBudget = "Smeta qoldig'i";
   static const String categories = "Kategoriyalar";
   static const String viewAll = "Barchasi";
   static const String recentExpenses = "So'nggi xarajatlar";

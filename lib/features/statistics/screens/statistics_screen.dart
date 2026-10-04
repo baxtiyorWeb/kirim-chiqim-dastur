@@ -10,6 +10,10 @@ import '../../../data/models/category_item.dart';
 import '../../../providers/finance_providers.dart';
 import '../widgets/bar_chart_widget.dart';
 import '../widgets/donut_chart_widget.dart';
+import '../../../core/intelligence/models/financial_health.dart';
+import '../../../core/intelligence/providers/financial_intelligence_provider.dart';
+import '../../../core/intelligence/widgets/what_if_sheet.dart';
+import '../../../core/utils/currency_formatter.dart';
 
 class StatisticsScreen extends ConsumerStatefulWidget {
   const StatisticsScreen({super.key});
@@ -26,6 +30,7 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
     final transactions = ref.watch(transactionsProvider);
     final totalExpenses = ref.watch(totalExpensesProvider);
     final categoryExpenses = ref.watch(categoryExpensesProvider);
+    final healthState = ref.watch(financialIntelligenceProvider);
     final colors = context.appColors;
 
     // Dynamically calculate period expenses based on selected period
@@ -237,6 +242,11 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
               ),
             ),
 
+            const SizedBox(height: AppDimensions.space16),
+
+            // Financial Intelligence & Predictive Forecast Card
+            _buildSmartStatisticsIntelligenceCard(context, colors, healthState),
+
             const SizedBox(height: AppDimensions.space20),
 
             // Category Breakdown Section: "Kategoriyalar bo'yicha"
@@ -336,6 +346,182 @@ class _StatisticsScreenState extends ConsumerState<StatisticsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSmartStatisticsIntelligenceCard(
+    BuildContext context,
+    AppThemeTokens colors,
+    FinancialHealthState health,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isHealthy = health.runwayDays >= 45;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppDimensions.space16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF16191F) : Colors.white,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+        border: Border.all(
+          color: isHealthy
+              ? const Color(0xFF007A55).withValues(alpha: 0.3)
+              : Colors.amber.shade700.withValues(alpha: 0.5),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: isHealthy
+                          ? const Color(0xFF007A55).withValues(alpha: 0.12)
+                          : Colors.amber.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isHealthy ? Icons.insights_rounded : Icons.warning_amber_rounded,
+                      size: 16,
+                      color: isHealthy ? const Color(0xFF007A55) : Colors.amber.shade800,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Mablag\' yetish muddati',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isHealthy ? const Color(0xFF007A55) : Colors.amber.shade800,
+                    ),
+                  ),
+                ],
+              ),
+              GestureDetector(
+                onTap: () {
+                  HapticUtil.selection();
+                  showWhatIfSimulatorSheet(context);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF007A55).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusPill),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calculate_outlined, size: 13, color: Color(0xFF007A55)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Hisoblash',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF007A55),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mablag\' yetish muddati',
+                      style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '~${health.runwayDays} kun',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: isHealthy ? const Color(0xFF10B981) : Colors.amber.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(width: 1, height: 30, color: colors.border),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kunlik xarajat me\'yori',
+                      style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${CurrencyFormatter.format(health.safeToSpendToday)}/kun',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF007A55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isHealthy
+                  ? colors.surfaceVariant.withValues(alpha: 0.5)
+                  : Colors.amber.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  isHealthy ? Icons.verified_user_outlined : Icons.info_outline_rounded,
+                  size: 16,
+                  color: isHealthy ? const Color(0xFF007A55) : Colors.amber.shade900,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isHealthy
+                        ? 'Moliyaviy holatingiz barqaror. Joriy xarajat sur\'atida mablag\'ingiz ${health.runwayDays} kundan ortiq muddatga yetadi.'
+                        : 'Diqqat: Mablag\'ingiz taxminan ${health.runwayDays} kunga yetadi. Katta xarajatlardan oldin hisoblab ko\'rish tavsiya etiladi.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

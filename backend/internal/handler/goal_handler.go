@@ -91,7 +91,7 @@ func (h *GoalHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	goals, err := h.repo.ListGoals(r.Context(), userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to retrieve goals")
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve goals: "+err.Error())
 		return
 	}
 

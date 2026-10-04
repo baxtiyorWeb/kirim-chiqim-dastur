@@ -29,11 +29,13 @@ class FinanceRepository {
   final Map<String, StatisticsResponse> _statisticsCache = {};
   UserProfile _userProfile = UserProfile.guest();
   bool _isInitialized = false;
+  VoidCallback? onLogout;
 
   FinanceRepository(this._storage, [ApiClient? api])
       : _api = api ?? ApiClient(_storage) {
     _api.onUnauthorized = () {
       logout();
+      onLogout?.call();
     };
   }
 
@@ -74,6 +76,7 @@ class FinanceRepository {
       final resMap = Map<String, dynamic>.from(response);
       final isNewUser = resMap['isNewUser'] == true;
       if (!isNewUser) {
+        _resetMemorySession();
         final token = resMap['token']?.toString();
         final user = resMap['user'] as Map<String, dynamic>?;
         if (token != null) {
@@ -102,6 +105,7 @@ class FinanceRepository {
     });
 
     if (response is Map) {
+      _resetMemorySession();
       final token = response['token']?.toString();
       final user = response['user'] as Map<String, dynamic>?;
       if (token != null) {
@@ -127,6 +131,7 @@ class FinanceRepository {
     });
 
     if (response is Map) {
+      _resetMemorySession();
       final token = response['token']?.toString();
       final user = response['user'] as Map<String, dynamic>?;
       if (token != null) {
@@ -153,6 +158,7 @@ class FinanceRepository {
     });
 
     if (response is Map) {
+      _resetMemorySession();
       final token = response['token']?.toString();
       final user = response['user'] as Map<String, dynamic>?;
       if (token != null) {
@@ -171,8 +177,10 @@ class FinanceRepository {
     }
   }
 
-  Future<void> logout() async {
-    await _storage.clearAllData();
+  /// Wipes all in-memory financial and user caches instantly
+  void _resetMemorySession() {
+    _inFlightDashboard = null;
+    _inFlightTransactions = null;
     _transactions = [];
     _debts = [];
     _budget = BudgetModel.defaultBudget();
@@ -181,6 +189,11 @@ class FinanceRepository {
     _statisticsCache.clear();
     _userProfile = UserProfile.guest();
     _isInitialized = false;
+  }
+
+  Future<void> logout() async {
+    _resetMemorySession();
+    await _storage.clearAllData();
   }
 
   Future<UserProfile> fetchProfile() async {
@@ -240,18 +253,31 @@ class FinanceRepository {
     if (!isAuthenticated) return;
 
     try {
+      Future<dynamic> safeGet(String endpoint, [Map<String, dynamic>? queryParams]) async {
+        try {
+          return await _api.get(endpoint, queryParams: queryParams);
+        } catch (e) {
+          debugPrint('[FinanceRepository] sync error for $endpoint: $e');
+          return null;
+        }
+      }
+
       final results = await Future.wait([
-        _api.get(ApiConstants.dashboard),
-        _api.get(ApiConstants.transactions),
-        _api.get(ApiConstants.budget),
-        _api.get(ApiConstants.debts),
-        _api.get(ApiConstants.goals),
-        _api.get(ApiConstants.authMe),
+        safeGet(ApiConstants.dashboard),
+        safeGet(ApiConstants.transactions),
+        safeGet(ApiConstants.budget),
+        safeGet(ApiConstants.debts),
+        safeGet(ApiConstants.goals),
+        safeGet(ApiConstants.authMe),
       ]);
+
+      if (!isAuthenticated) return;
 
       // 1. Dashboard summary
       if (results[0] is Map<String, dynamic>) {
         _dashboardSummary = DashboardSummary.fromJson(results[0] as Map<String, dynamic>);
+      } else {
+        _dashboardSummary = DashboardSummary.empty();
       }
 
       // 2. Transactions
@@ -259,11 +285,15 @@ class FinanceRepository {
         _transactions = (results[1] as List)
             .map((e) => TransactionItem.fromJson(e as Map<String, dynamic>))
             .toList();
+      } else {
+        _transactions = [];
       }
 
       // 3. Budget
       if (results[2] is Map<String, dynamic>) {
         _budget = BudgetModel.fromJson(results[2] as Map<String, dynamic>);
+      } else {
+        _budget = BudgetModel.defaultBudget();
       }
 
       // 4. Debts
@@ -271,6 +301,8 @@ class FinanceRepository {
         _debts = (results[3] as List)
             .map((e) => DebtItem.fromJson(e as Map<String, dynamic>))
             .toList();
+      } else {
+        _debts = [];
       }
 
       // 5. Goals
@@ -278,6 +310,8 @@ class FinanceRepository {
         _goals = (results[4] as List)
             .map((e) => SavingsGoal.fromJson(e as Map<String, dynamic>))
             .toList();
+      } else {
+        _goals = [];
       }
 
       // 6. Profile
@@ -285,6 +319,7 @@ class FinanceRepository {
         _userProfile = UserProfile.fromJson(results[5] as Map<String, dynamic>);
       }
 
+      _statisticsCache.clear();
       _isInitialized = true;
     } catch (e) {
       debugPrint('[FinanceRepository] syncAllWithBackend warning: $e');
@@ -295,17 +330,32 @@ class FinanceRepository {
   // DASHBOARD
   // -------------------------------------------------------------
 
+  Future<DashboardSummary>? _inFlightDashboard;
+
   DashboardSummary getDashboardSummary() => _dashboardSummary;
 
-  Future<DashboardSummary> fetchDashboard() async {
-    if (!isAuthenticated) return _dashboardSummary;
+  Future<DashboardSummary> fetchDashboard() {
+    if (!isAuthenticated) return Future.value(_dashboardSummary);
+    if (_inFlightDashboard != null) return _inFlightDashboard!;
+
+    _inFlightDashboard = _doFetchDashboard().whenComplete(() {
+      _inFlightDashboard = null;
+    });
+    return _inFlightDashboard!;
+  }
+
+  Future<DashboardSummary> _doFetchDashboard() async {
     try {
       final res = await _api.get(ApiConstants.dashboard);
       if (res is Map<String, dynamic>) {
         _dashboardSummary = DashboardSummary.fromJson(res);
+        // Seed transactions if empty
+        if (_transactions.isEmpty && _dashboardSummary.recentTransactions.isNotEmpty) {
+          _transactions = List.from(_dashboardSummary.recentTransactions);
+        }
       }
     } catch (e) {
-      debugPrint('[FinanceRepository] fetchDashboard error: $e');
+      debugPrint('[FinanceRepository] fetchDashboard notice: $e');
     }
     return _dashboardSummary;
   }
@@ -313,6 +363,8 @@ class FinanceRepository {
   // -------------------------------------------------------------
   // TRANSACTIONS
   // -------------------------------------------------------------
+
+  Future<List<TransactionItem>>? _inFlightTransactions;
 
   List<TransactionItem> getTransactions() => List.unmodifiable(_transactions);
 
@@ -326,6 +378,44 @@ class FinanceRepository {
   }) async {
     if (!isAuthenticated) return _transactions;
 
+    // Deduplicate default page 1 fetches
+    final isDefaultQuery = type == null &&
+        categoryId == null &&
+        startDate == null &&
+        endDate == null &&
+        (offset == null || offset == 0);
+
+    if (isDefaultQuery && _inFlightTransactions != null) {
+      return _inFlightTransactions!;
+    }
+
+    final future = _doFetchTransactions(
+      type: type,
+      categoryId: categoryId,
+      startDate: startDate,
+      endDate: endDate,
+      limit: limit,
+      offset: offset,
+    );
+
+    if (isDefaultQuery) {
+      _inFlightTransactions = future.whenComplete(() {
+        _inFlightTransactions = null;
+      });
+      return _inFlightTransactions!;
+    }
+
+    return future;
+  }
+
+  Future<List<TransactionItem>> _doFetchTransactions({
+    String? type,
+    String? categoryId,
+    DateTime? startDate,
+    DateTime? endDate,
+    int? limit,
+    int? offset,
+  }) async {
     final query = <String, dynamic>{};
     if (type != null && type != 'all') query['type'] = type;
     if (categoryId != null && categoryId != 'all') query['categoryId'] = categoryId;
@@ -351,7 +441,7 @@ class FinanceRepository {
         }
       }
     } catch (e) {
-      debugPrint('[FinanceRepository] fetchTransactions error: $e');
+      debugPrint('[FinanceRepository] fetchTransactions notice: $e');
     }
     return _transactions;
   }
@@ -693,17 +783,39 @@ class FinanceRepository {
     return buffer.toString();
   }
 
-  int getInitialBalance() => _storage.getInitialBalance();
-  Future<void> setInitialBalance(int amount) => _storage.saveInitialBalance(amount);
+  int getInitialBalance() {
+    if (_userProfile.initialBalance > 0) return _userProfile.initialBalance;
+    if (_dashboardSummary.initialBalance > 0) return _dashboardSummary.initialBalance;
+    return 0;
+  }
+
+  Future<void> setInitialBalance(int amount) async {
+    _userProfile = _userProfile.copyWith(initialBalance: amount);
+    _dashboardSummary = DashboardSummary(
+      balance: amount + _dashboardSummary.totalIncome - _dashboardSummary.totalExpense,
+      initialBalance: amount,
+      totalIncome: _dashboardSummary.totalIncome,
+      totalExpense: _dashboardSummary.totalExpense,
+      todayIncome: _dashboardSummary.todayIncome,
+      todayExpense: _dashboardSummary.todayExpense,
+      monthExpense: _dashboardSummary.monthExpense,
+      remainingBudget: _dashboardSummary.remainingBudget,
+      categoryExpenses: _dashboardSummary.categoryExpenses,
+      recentTransactions: _dashboardSummary.recentTransactions,
+      hasLoaded: true,
+    );
+    if (isAuthenticated) {
+      try {
+        await _api.put(ApiConstants.authInitialBalance, body: {
+          'initialBalance': amount,
+        });
+      } catch (e) {
+        debugPrint('[FinanceRepository] setInitialBalance cloud sync notice: $e');
+      }
+    }
+  }
 
   Future<void> clearAllData() async {
-    await _storage.clearAllData();
-    _transactions = [];
-    _debts = [];
-    _budget = BudgetModel.defaultBudget();
-    _goals = [];
-    _dashboardSummary = DashboardSummary.empty();
-    _statisticsCache.clear();
-    _userProfile = UserProfile.guest();
+    await logout();
   }
 }

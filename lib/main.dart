@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/guide/guide.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'data/services/local_storage_service.dart';
@@ -63,6 +64,11 @@ class _FinanceTrackerAppState extends ConsumerState<FinanceTrackerApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: _router,
+      builder: (context, child) {
+        return GuideOverlay(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

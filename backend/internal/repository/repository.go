@@ -20,10 +20,12 @@ type TransactionFilter struct {
 type Repository interface {
 	// User / Auth
 	CreateUser(ctx context.Context, user *models.User) error
+	EnsureUserExists(ctx context.Context, userID uuid.UUID, phone, fullName string) error
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	GetUserByPhone(ctx context.Context, phone string) (*models.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	UpdateUser(ctx context.Context, user *models.User) error
+	UpdateInitialBalance(ctx context.Context, userID uuid.UUID, amount int64) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 
 	// Transactions

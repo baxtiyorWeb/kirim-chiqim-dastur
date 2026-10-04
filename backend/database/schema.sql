@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(255) NOT NULL,
     avatar_url TEXT,
     currency VARCHAR(10) NOT NULL DEFAULT 'UZS',
+    initial_balance BIGINT NOT NULL DEFAULT 0,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -63,6 +64,8 @@ BEGIN
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS color_hex VARCHAR(30) DEFAULT '#FF6B6B';
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS bg_color_hex VARCHAR(30) DEFAULT '#FFEAEA';
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT TRUE;
+
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS initial_balance BIGINT NOT NULL DEFAULT 0;
 
     -- Reset any legacy dummy 5,000,000 budget limits
     UPDATE budgets SET total_monthly_limit = 0 WHERE total_monthly_limit = 5000000;

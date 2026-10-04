@@ -4,20 +4,42 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/guide/guide.dart';
+import '../../../core/intelligence/providers/financial_intelligence_provider.dart';
+import '../../../core/intelligence/widgets/what_if_sheet.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
 import '../../../core/widgets/app_bottom_sheets.dart';
 import '../../../providers/finance_providers.dart';
 import '../widgets/dashboard_hero_card.dart';
+import '../widgets/financial_radar_card.dart';
 import '../widgets/metric_summary_cards.dart';
 import '../widgets/categories_horizontal_list.dart';
 import '../widgets/recent_expenses_list.dart';
 import '../widgets/fintech_quick_banners.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final guide = ref.read(guideControllerProvider.notifier);
+        if (!guide.isTourCompleted(AppTours.firstLaunchTourId)) {
+          guide.startTour(AppTours.firstLaunchTour);
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final dashboard = ref.watch(dashboardSummaryProvider);
     final userProfile = ref.watch(userProfileProvider);
     final transactions = ref.watch(transactionsProvider);
@@ -25,14 +47,17 @@ class DashboardScreen extends ConsumerWidget {
     final debtsSummary = ref.watch(debtsSummaryProvider);
     final colors = context.appColors;
 
+    final healthState = ref.watch(financialIntelligenceProvider);
     final displayName = userProfile.fullName.isNotEmpty && userProfile.fullName != 'Foydalanuvchi'
         ? userProfile.fullName
         : ref.watch(financeRepositoryProvider).currentUserName ?? 'Foydalanuvchi';
 
-    // Prefer aggregated PostgreSQL dashboard metrics
-    final balance = dashboard.balance != 0 ? dashboard.balance : ref.watch(balanceProvider);
+    // Single Source of Truth ledger balance
+    final balance = ref.watch(balanceProvider);
     final totalExpenses = dashboard.monthExpense != 0 ? dashboard.monthExpense : dashboard.totalExpense;
-    final remainingBudget = dashboard.remainingBudget != 0 ? dashboard.remainingBudget : balance;
+    final remainingBudget = dashboard.totalMonthlyLimit > 0
+        ? dashboard.remainingBudget
+        : (budget.totalMonthlyBudget - totalExpenses);
     final categoryExpenses = dashboard.categoryExpenses.isNotEmpty
         ? dashboard.categoryExpenses
         : ref.watch(categoryExpensesProvider);
@@ -48,13 +73,7 @@ class DashboardScreen extends ConsumerWidget {
           color: const Color(0xFF007A55),
           onRefresh: () async {
             HapticUtil.selection();
-            await Future.wait([
-              ref.read(dashboardSummaryProvider.notifier).refresh(),
-              ref.read(transactionsProvider.notifier).refresh(),
-              ref.read(budgetProvider.notifier).refresh(),
-              ref.read(debtsProvider.notifier).refresh(),
-              ref.read(userProfileProvider.notifier).refresh(),
-            ]);
+            await ref.read(dashboardSummaryProvider.notifier).refresh();
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -144,16 +163,34 @@ class DashboardScreen extends ConsumerWidget {
 
                 const SizedBox(height: AppDimensions.space16),
 
-                // Hero Card (Server Balance & Total Expenses)
+                // Hero Card (Server Balance, Safe-to-Spend & Simulator)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
-                  child: DashboardHeroCard(
-                    totalExpenses: totalExpenses,
-                    onTap: () {
-                      HapticUtil.light();
-                      context.push('/statistics');
-                    },
+                  child: GuideTarget(
+                    id: 'dashboard_balance',
+                    child: DashboardHeroCard(
+                      balance: balance,
+                      initialBalance: ref.watch(initialBalanceProvider),
+                      totalExpenses: totalExpenses,
+                      safeToSpendToday: healthState.safeToSpendToday,
+                      onTap: () {
+                        HapticUtil.light();
+                        context.push('/statistics');
+                      },
+                      onSimulatorTap: () {
+                        HapticUtil.medium();
+                        showWhatIfSimulatorSheet(context);
+                      },
+                    ),
                   ),
+                ),
+
+                const SizedBox(height: AppDimensions.space12),
+
+                // Financial Radar Card (Live predictive radar & risk warnings)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppDimensions.space20),
+                  child: FinancialRadarCard(),
                 ),
 
                 const SizedBox(height: AppDimensions.space12),
@@ -184,7 +221,9 @@ class DashboardScreen extends ConsumerWidget {
                 FintechQuickBanners(
                   debtsSummary: debtsSummary,
                   budgetSpent: totalExpenses,
-                  budgetTotal: budget.totalMonthlyBudget,
+                  budgetTotal: dashboard.totalMonthlyLimit > 0
+                      ? dashboard.totalMonthlyLimit
+                      : budget.totalMonthlyBudget,
                   onDebtsTap: () => context.push('/debts'),
                   onBudgetTap: () => context.push('/budget'),
                 ),

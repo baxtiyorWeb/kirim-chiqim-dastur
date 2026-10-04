@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/guide/guide.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
@@ -58,29 +59,32 @@ class CustomBottomNavBar extends StatelessWidget {
               ),
 
               // 3. Central FAB "+" Button
-              GestureDetector(
-                onTap: () {
-                  HapticUtil.medium();
-                  onAddPressed();
-                },
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.38),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    color: Colors.white,
-                    size: 28,
+              GuideTarget(
+                id: 'bottom_nav_add',
+                child: GestureDetector(
+                  onTap: () {
+                    HapticUtil.medium();
+                    onAddPressed();
+                  },
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.38),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
                 ),
               ),
@@ -117,12 +121,32 @@ class CustomBottomNavBar extends StatelessWidget {
     final isSelected = currentIndex == index;
     final color = isSelected ? AppColors.primary : colors.textSecondary;
 
+    final String targetId;
+    switch (index) {
+      case 0:
+        targetId = 'bottom_nav_home';
+        break;
+      case 1:
+        targetId = 'bottom_nav_transactions';
+        break;
+      case 2:
+        targetId = 'bottom_nav_stats';
+        break;
+      case 3:
+        targetId = 'bottom_nav_profile';
+        break;
+      default:
+        targetId = 'bottom_nav_$index';
+    }
+
     return Expanded(
-      child: InkWell(
-        onTap: () {
-          HapticUtil.selection();
-          onTabSelected(index);
-        },
+      child: GuideTarget(
+        id: targetId,
+        child: InkWell(
+          onTap: () {
+            HapticUtil.selection();
+            onTabSelected(index);
+          },
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         child: Column(
@@ -146,6 +170,7 @@ class CustomBottomNavBar extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

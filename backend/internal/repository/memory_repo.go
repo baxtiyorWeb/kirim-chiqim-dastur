@@ -111,6 +111,39 @@ func (m *MemoryRepository) UpdateUser(ctx context.Context, user *models.User) er
 	return nil
 }
 
+func (m *MemoryRepository) EnsureUserExists(ctx context.Context, userID uuid.UUID, phone, fullName string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.users[userID]; !ok {
+		name := fullName
+		if name == "" {
+			name = "Foydalanuvchi"
+		}
+		m.users[userID] = &models.User{
+			ID:          userID,
+			PhoneNumber: phone,
+			FullName:    name,
+			Currency:    "UZS",
+			IsActive:    true,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+	}
+	return nil
+}
+
+func (m *MemoryRepository) UpdateInitialBalance(ctx context.Context, userID uuid.UUID, amount int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u, ok := m.users[userID]
+	if !ok || u.DeletedAt != nil {
+		return ErrNotFound
+	}
+	u.InitialBalance = amount
+	u.UpdatedAt = time.Now()
+	return nil
+}
+
 func (m *MemoryRepository) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -496,7 +529,10 @@ func (m *MemoryRepository) GetDashboardSummary(ctx context.Context, userID uuid.
 		}
 	}
 
-	summary.Balance = summary.TotalIncome - summary.TotalExpense
+	if u, ok := m.users[userID]; ok && u.DeletedAt == nil {
+		summary.InitialBalance = u.InitialBalance
+	}
+	summary.Balance = summary.InitialBalance + summary.TotalIncome - summary.TotalExpense
 
 	// Remaining budget
 	key := fmt.Sprintf("%s:%s", userID, monthStr)
@@ -505,9 +541,29 @@ func (m *MemoryRepository) GetDashboardSummary(ctx context.Context, userID uuid.
 		if rem < 0 {
 			rem = 0
 		}
+		summary.TotalMonthlyLimit = b.TotalMonthlyLimit
 		summary.RemainingBudget = rem
 	} else {
+		summary.TotalMonthlyLimit = 0
 		summary.RemainingBudget = 0
+	}
+
+	// Debts summary metrics
+	for _, d := range m.debts {
+		if d.UserID != userID || d.Status == "returned" {
+			continue
+		}
+		rem := d.Amount - d.PaidAmount
+		if rem < 0 {
+			rem = 0
+		}
+		if d.DebtType == "borrowed" {
+			summary.TotalBorrowed += d.Amount
+			summary.RemainingBorrowed += rem
+		} else if d.DebtType == "lent" {
+			summary.TotalLent += d.Amount
+			summary.RemainingLent += rem
+		}
 	}
 
 	// Recent transactions

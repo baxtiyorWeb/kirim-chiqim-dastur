@@ -12,15 +12,20 @@ import '../../features/budget/screens/budget_screen.dart';
 import '../../features/goals/screens/goals_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/auth/screens/auth_screen.dart';
+import '../../features/pricing/screens/pricing_screen.dart';
 
 class AppRouter {
   AppRouter._();
 
   static final GlobalKey<NavigatorState> _rootNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'root');
+  static GlobalKey<NavigatorState> get rootNavigatorKey => _rootNavigatorKey;
+
+  static GoRouter? _router;
+  static GoRouter? get routerInstance => _router;
 
   static GoRouter createRouter({required bool hasSeenOnboarding}) {
-    return GoRouter(
+    final r = GoRouter(
       navigatorKey: _rootNavigatorKey,
       initialLocation: hasSeenOnboarding ? '/dashboard' : '/onboarding',
       routes: [
@@ -187,7 +192,27 @@ class AppRouter {
             },
           ),
         ),
+        GoRoute(
+          path: '/pricing',
+          parentNavigatorKey: _rootNavigatorKey,
+          pageBuilder: (context, state) => CustomTransitionPage(
+            key: state.pageKey,
+            child: const PricingScreen(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              final offsetTween = Tween<Offset>(
+                begin: const Offset(0.0, 0.1),
+                end: Offset.zero,
+              ).chain(CurveTween(curve: Curves.easeOutCubic));
+              return SlideTransition(
+                position: animation.drive(offsetTween),
+                child: FadeTransition(opacity: animation, child: child),
+              );
+            },
+          ),
+        ),
       ],
     );
+    _router = r;
+    return r;
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/guide/guide.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
@@ -187,8 +188,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppDimensions.space20),
-              child: Row(
-                children: [
+              child: GuideTarget(
+                id: 'transactions_list',
+                child: Row(
+                  children: [
                   // Total Expenses Card
                   Expanded(
                     child: Container(
@@ -310,6 +313,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
               ),
             ),
           ),
+        ),
 
           const SliverToBoxAdapter(child: SizedBox(height: AppDimensions.space16)),
 
@@ -417,11 +421,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                           confirmLabel: 'O\'chirish',
                           isDestructive: true,
                           icon: Icons.delete_outline_rounded,
+                          onConfirm: () async {
+                            await ref.read(transactionsProvider.notifier).deleteTransaction(item.id);
+                          },
                         );
                       },
                       onDismissed: (_) {
                         HapticUtil.medium();
-                        ref.read(transactionsProvider.notifier).deleteTransaction(item.id);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: const Text('Xarajat o\'chirildi'),

@@ -8,7 +8,7 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData get lightTheme {
-    final fontName = GoogleFonts.plusJakartaSans().fontFamily;
+    final fontName = GoogleFonts.inter().fontFamily;
 
     return ThemeData(
       useMaterial3: true,
@@ -127,7 +127,7 @@ class AppTheme {
   }
 
   static ThemeData get darkTheme {
-    final fontName = GoogleFonts.plusJakartaSans().fontFamily;
+    final fontName = GoogleFonts.inter().fontFamily;
 
     return ThemeData(
       useMaterial3: true,

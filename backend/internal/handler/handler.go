@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
+	log.Printf("[API ERROR %d] %s\n", status, message)
 	writeJSON(w, status, map[string]string{"error": message})
 }
 

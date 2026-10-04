@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 
 class ApiConstants {
   // Configurable base URL
-  // Default for physical Android devices: host IP or localhost (with adb reverse)
-  static const String _defaultHost = '192.168.104.192'; // PC IP on LAN
+  // Default for physical Android devices with 'adb reverse tcp:8080 tcp:8080': 127.0.0.1
+  static const String _defaultHost = '127.0.0.1';
   static const String _defaultPort = '8080';
 
   static String get defaultBaseUrl {
@@ -12,8 +12,7 @@ class ApiConstants {
       return 'http://localhost:$_defaultPort';
     }
     if (Platform.isAndroid) {
-      // With ADB reverse tcp:8080 tcp:8080, localhost works directly on USB-connected device.
-      // 192.168.104.192 works over Wi-Fi.
+      // With ADB reverse tcp:8080 tcp:8080, 127.0.0.1 works directly on USB-connected device.
       return 'http://$_defaultHost:$_defaultPort';
     }
     return 'http://localhost:$_defaultPort';
@@ -28,6 +27,7 @@ class ApiConstants {
   static const String authCompleteRegistration = '/api/v1/auth/complete-registration';
   static const String authMe = '/api/v1/auth/me';
   static const String authProfile = '/api/v1/auth/profile';
+  static const String authInitialBalance = '/api/v1/auth/initial-balance';
   static const String authDeleteAccount = '/api/v1/auth/account';
 
   static const String transactions = '/api/v1/transactions';

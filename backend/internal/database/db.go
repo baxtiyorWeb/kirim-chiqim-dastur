@@ -27,6 +27,7 @@ func InitRepository(databaseURL string) (repository.Repository, func(), error) {
 	cleanURL = strings.ReplaceAll(cleanURL, "&channel_binding=require", "")
 	cleanURL = strings.ReplaceAll(cleanURL, "?channel_binding=require", "")
 	cleanURL = strings.ReplaceAll(cleanURL, "channel_binding=require&", "")
+	cleanURL = strings.ReplaceAll(cleanURL, "-pooler.", ".")
 
 	log.Printf("[Database] Connecting to PostgreSQL / Neon: %s\n", maskConnStr(cleanURL))
 	db, err := sql.Open("postgres", cleanURL)
@@ -38,6 +39,7 @@ func InitRepository(databaseURL string) (repository.Repository, func(), error) {
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(15 * time.Minute)
+	db.SetConnMaxIdleTime(1 * time.Minute)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

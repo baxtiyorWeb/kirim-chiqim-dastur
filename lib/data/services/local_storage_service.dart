@@ -22,6 +22,7 @@ class LocalStorageService {
     'app_budget',
     'app_goals',
     'app_initial_balance',
+    'initial_balance',
   ];
 
   final SharedPreferences _prefs;
@@ -138,10 +139,49 @@ class LocalStorageService {
     await _prefs.setString(_themeModeKey, mode.name);
   }
 
+  // -------------------------------------------------------------
+  // PRO MEMBERSHIP & SUBSCRIPTION STATUS
+  // -------------------------------------------------------------
+  static const String _isProKey = 'is_pro_member';
+
+  bool get isProMember => _prefs.getBool(_isProKey) ?? false;
+  Future<void> setProMember(bool value) async {
+    await _prefs.setBool(_isProKey, value);
+  }
+
+  // -------------------------------------------------------------
+  // GUIDED TOUR & PRODUCT EDUCATION PERSISTENCE
+  // -------------------------------------------------------------
+  static const String _completedToursPrefix = 'guide_tour_completed_';
+
+  bool isTourCompleted(String tourId) {
+    return _prefs.getBool('$_completedToursPrefix$tourId') ?? false;
+  }
+
+  Future<void> setTourCompleted(String tourId, [bool completed = true]) async {
+    await _prefs.setBool('$_completedToursPrefix$tourId', completed);
+  }
+
+  Future<void> resetAllTours() async {
+    final keys = _prefs.getKeys().where((k) => k.startsWith(_completedToursPrefix)).toList();
+    for (final key in keys) {
+      await _prefs.remove(key);
+    }
+  }
+
+  static const String _initialBalanceKey = 'initial_balance';
+
   int _sessionInitialBalance = 0;
-  int getInitialBalance() => _sessionInitialBalance;
+  int getInitialBalance() {
+    return _sessionInitialBalance;
+  }
+
   Future<void> saveInitialBalance(int amount) async {
     _sessionInitialBalance = amount;
+    // Explicitly ensure no un-scoped balance persists in SharedPreferences
+    if (_prefs.containsKey(_initialBalanceKey)) {
+      await _prefs.remove(_initialBalanceKey);
+    }
   }
 
   /// Secure session clear on logout
@@ -151,6 +191,7 @@ class LocalStorageService {
     await _prefs.remove(_userEmailKey);
     await _prefs.remove(_userNameKey);
     await _prefs.remove(_userPhoneKey);
+    await _prefs.remove(_initialBalanceKey);
     _sessionInitialBalance = 0;
     await _purgeLegacyBusinessData();
   }

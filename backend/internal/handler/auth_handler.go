@@ -154,11 +154,86 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.repo.GetUserByID(r.Context(), userID)
 	if err != nil {
+		if err == repository.ErrNotFound {
+			user = &models.User{
+				ID:        userID,
+				FullName:  "Foydalanuvchi",
+				Currency:  "UZS",
+				IsActive:  true,
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+			_ = h.repo.CreateUser(r.Context(), user)
+			writeJSON(w, http.StatusOK, user)
+			return
+		}
 		writeError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
 	writeJSON(w, http.StatusOK, user)
+}
+
+type SetInitialBalanceRequest struct {
+	InitialBalance int64 `json:"initialBalance"`
+}
+
+func (h *AuthHandler) SetInitialBalance(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var req SetInitialBalanceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	if req.InitialBalance < 0 {
+		writeError(w, http.StatusBadRequest, "Boshlang'ich balans manfiy bo'lishi mumkin emas")
+		return
+	}
+
+	user, err := h.repo.GetUserByID(r.Context(), userID)
+	if err != nil {
+		if err == repository.ErrNotFound {
+			user = &models.User{
+				ID:             userID,
+				FullName:       "Foydalanuvchi",
+				Currency:       "UZS",
+				InitialBalance: req.InitialBalance,
+				IsActive:       true,
+				CreatedAt:      time.Now(),
+				UpdatedAt:      time.Now(),
+			}
+			if createErr := h.repo.CreateUser(r.Context(), user); createErr != nil {
+				writeError(w, http.StatusInternalServerError, "Foydalanuvchi yaratishda xatolik: "+createErr.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"message":        "Boshlang'ich balans saqlandi",
+				"initialBalance": req.InitialBalance,
+				"user":           user,
+			})
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "Foydalanuvchini tekshirishda xatolik")
+		return
+	}
+
+	if err := h.repo.UpdateInitialBalance(r.Context(), userID, req.InitialBalance); err != nil {
+		writeError(w, http.StatusInternalServerError, "Boshlang'ich balansni saqlashda xatolik: "+err.Error())
+		return
+	}
+
+	user.InitialBalance = req.InitialBalance
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":        "Boshlang'ich balans saqlandi",
+		"initialBalance": req.InitialBalance,
+		"user":           user,
+	})
 }
 
 type UpdateProfileRequest struct {

@@ -107,7 +107,7 @@ func (h *DebtHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	debts, err := h.repo.ListDebts(r.Context(), userID, debtType, status)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Failed to retrieve debts")
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve debts: "+err.Error())
 		return
 	}
 
