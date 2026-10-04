@@ -1,0 +1,34 @@
+name: Render Backend Keep Alive
+
+on:
+  schedule:
+    # Har 12 minutda ishga tushadi (Render 15 minutlik nofaollikda uxlaydi)
+    - cron: '*/12 * * * *'
+  workflow_dispatch: # GitHub dashboarddan qo'lda tekshirish uchun
+
+jobs:
+  ping:
+    name: Ping Render Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Ping Backend Endpoint
+        run: |
+          URL="${{ secrets.RENDER_BACKEND_URL }}"
+          if [ -z "$URL" ]; then
+            URL="https://kirim-chiqim-backend.onrender.com"
+          fi
+          
+          HEALTH_URL="${URL%/}/health"
+          echo "Pinging: $HEALTH_URL at $(date -u)"
+          
+          # Maxsus User-Agent va 25 soniyalik timeout bilan xavfsiz so'rov
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -A "GitHubAction-KeepAlive/2026" --max-time 25 "$HEALTH_URL" || echo "FAILED")
+          
+          echo "Response HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Server uyg'oq va sog'lom holatda!"
+          else
+            echo "⚠️ Server javob kodi: $HTTP_STATUS (uyg'onish jarayonida bo'lishi mumkin)"
+          fi
