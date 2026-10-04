@@ -8,7 +8,7 @@
 set -u
 
 # URL argument sifatida berilishi yoki standart olinishi mumkin
-URL="${1:-https://kirim-chiqim-backend.onrender.com}"
+URL="${1:-https://kirim-chiqim-dastur.onrender.com}"
 HEALTH_URL="${URL%/}/health"
 INTERVAL_MINUTES="${2:-12}"
 INTERVAL_SECONDS=$((INTERVAL_MINUTES * 60))

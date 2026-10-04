@@ -11,7 +11,7 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 
-DEFAULT_URL = "https://kirim-chiqim-backend.onrender.com/health"
+DEFAULT_URL = "https://kirim-chiqim-dastur.onrender.com/health"
 DEFAULT_INTERVAL_MINUTES = 12
 
 
