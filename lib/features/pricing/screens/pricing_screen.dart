@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_dimensions.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/haptic_feedback_util.dart';
+import '../../../core/widgets/paywall_sheet.dart';
 import '../../../providers/finance_providers.dart';
 
 class PricingScreen extends ConsumerStatefulWidget {
@@ -16,7 +17,6 @@ class PricingScreen extends ConsumerStatefulWidget {
 
 class _PricingScreenState extends ConsumerState<PricingScreen> {
   bool _isAnnual = true;
-  bool _isLoading = false;
 
   static const int _monthlyPrice = 19000;
   static const int _annualPrice = 149000; // ~12,416 UZS/mo (~35% discount)
@@ -152,26 +152,38 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                                 color: Color(0xFF10B981),
                               ),
                             ),
-                            Text(
-                              'Barcha aqlli tahlillar va hisob-kitoblar ochiq',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: colors.textSecondary,
-                              ),
-                            ),
+                            Builder(builder: (context) {
+                              final sub = ref.watch(subscriptionProvider);
+                              final exp = sub.subscription.currentPeriodEnd;
+                              if (exp != null) {
+                                return Text(
+                                  'Amal qilish muddati: ${exp.day}.${exp.month.toString().padLeft(2, '0')}.${exp.year}',
+                                  style: TextStyle(fontSize: 11.5, color: colors.textSecondary),
+                                );
+                              }
+                              return Text(
+                                'Barcha aqlli tahlillar va hisob-kitoblar ochiq',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: colors.textSecondary,
+                                ),
+                              );
+                            }),
                           ],
                         ),
                       ),
                       TextButton(
-                        onPressed: () {
+                        onPressed: () async {
                           HapticUtil.light();
-                          ref.read(proMemberProvider.notifier).setPro(false);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Pro obuna bekor qilindi (bepul reja faol)'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
+                          await ref.read(subscriptionProvider.notifier).cancelSubscription();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Pro obuna bekor qilindi (bepul reja faol)'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
                         },
                         child: const Text('Bekor qilish', style: TextStyle(fontSize: 12, color: Colors.redAccent)),
                       ),
@@ -318,37 +330,19 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                             borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
                           ),
                         ),
-                        onPressed: _isLoading || isPro
+                        onPressed: isPro
                             ? null
                             : () async {
                                 HapticUtil.medium();
-                                setState(() => _isLoading = true);
-                                await Future.delayed(const Duration(milliseconds: 600));
-                                ref.read(proMemberProvider.notifier).setPro(true);
-                                setState(() => _isLoading = false);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      backgroundColor: Color(0xFF007A55),
-                                      content: Text('Tabriklaymiz! 7 kunlik bepul sinov faollashtirildi 🎉'),
-                                      duration: Duration(seconds: 3),
-                                    ),
-                                  );
-                                }
+                                await showPaywallSheet(context, featureKey: 'pricing_screen');
                               },
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                              )
-                            : Text(
-                                isPro ? 'Sizda Pro Faol' : '7 Kun Bepul Boshlash',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                        child: Text(
+                          isPro ? 'Sizda Pro Faol' : (_isAnnual ? 'Yillik Pro Rejaga Ulanish' : 'Oylik Pro Rejaga Ulanish'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
 
@@ -486,7 +480,6 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   Widget _buildPeriodTab({
     required String title,
     required bool isSelected,
-    String? badge,
     required VoidCallback onTap,
   }) {
     return GestureDetector(

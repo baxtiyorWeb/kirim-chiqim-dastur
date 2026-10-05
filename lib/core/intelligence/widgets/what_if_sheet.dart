@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_dimensions.dart';
 import '../../utils/currency_formatter.dart';
 import '../../utils/haptic_feedback_util.dart';
+import '../../widgets/paywall_sheet.dart';
+import '../../../providers/finance_providers.dart';
 import '../models/financial_health.dart';
 import '../providers/financial_intelligence_provider.dart';
 
 /// Oddiy foydalanuvchiga tushunarli "Olsam bo'ladimi?" (Xaridni tekshirish) modali
-Future<void> showWhatIfSimulatorSheet(BuildContext context) {
+Future<void> showWhatIfSimulatorSheet(BuildContext context, [WidgetRef? ref]) async {
   HapticUtil.selection();
+  if (ref != null) {
+    final sub = ref.read(subscriptionProvider);
+    if (!sub.canUse('what_if_simulator')) {
+      await showPaywallSheet(context, featureKey: 'what_if_simulator');
+      return;
+    }
+  }
+  if (!context.mounted) return;
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -58,10 +67,20 @@ class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
     }
   }
 
-  void _tryRecordDecision() {
+  void _tryRecordDecision() async {
     if (!_decisionRecorded && _currentAmount > 0) {
       _decisionRecorded = true;
       ref.read(evaluatedDecisionsCountProvider.notifier).recordDecision();
+      try {
+        await ref.read(financeRepositoryProvider).evaluateWhatIf(
+          plannedExpense: _currentAmount,
+          title: 'Simulyatsiya',
+        );
+      } catch (e) {
+        if (mounted) {
+          showPaywallSheet(context, featureKey: 'what_if_simulator');
+        }
+      }
     }
   }
 
@@ -188,6 +207,59 @@ class _WhatIfSheetState extends ConsumerState<WhatIfSheet> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Builder(builder: (context) {
+              final sub = ref.watch(subscriptionProvider);
+              final ent = sub.getEntitlement('what_if_simulator');
+              final isPro = sub.isPro;
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isPro
+                      ? const Color(0xFF007A55).withValues(alpha: 0.1)
+                      : (ent != null && ent.remaining == 0 ? Colors.redAccent.withValues(alpha: 0.1) : colors.surfaceVariant),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                  border: Border.all(
+                    color: isPro
+                        ? const Color(0xFF007A55).withValues(alpha: 0.3)
+                        : (ent != null && ent.remaining == 0 ? Colors.redAccent.withValues(alpha: 0.3) : colors.border),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isPro ? Icons.verified_rounded : Icons.info_outline_rounded,
+                      size: 16,
+                      color: isPro ? const Color(0xFF007A55) : colors.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isPro
+                            ? 'Pro Intellekt: Cheksiz hisob-kitob ⭐'
+                            : (ent != null && ent.limit > 0
+                                ? 'Bepul tarif: bu oy ${ent.remaining}/${ent.limit} ta qoldi'
+                                : 'Oddiy tarif: oylik 3 ta hisob-kitob'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isPro ? const Color(0xFF007A55) : colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (!isPro)
+                      GestureDetector(
+                        onTap: () => showPaywallSheet(context, featureKey: 'what_if_simulator'),
+                        child: const Text(
+                          'Pro-ga o\'tish',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.primary),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
 
             const SizedBox(height: AppDimensions.space16),
 

@@ -7,6 +7,7 @@ import '../data/models/savings_goal.dart';
 import '../data/models/dashboard_summary.dart';
 import '../data/models/statistics_response.dart';
 import '../data/models/user_profile.dart';
+import '../data/models/billing_models.dart';
 import '../data/repositories/finance_repository.dart';
 import '../data/services/local_storage_service.dart';
 
@@ -637,6 +638,7 @@ void resetAllFinanceProviders(dynamic ref) {
   ref.read(statisticsProvider.notifier).reset();
   ref.read(initialBalanceProvider.notifier).reset();
   ref.read(selectedDateFilterProvider.notifier).reset();
+  ref.read(subscriptionProvider.notifier).reset();
 }
 
 /// Synchronizes all Riverpod notifiers with the authenticated user's freshly fetched PostgreSQL data.
@@ -651,6 +653,7 @@ void syncAllFinanceProviders(dynamic ref) {
   ref.read(initialBalanceProvider.notifier).reset(repo.getInitialBalance());
   ref.read(statisticsProvider.notifier).reset();
   ref.read(selectedDateFilterProvider.notifier).reset();
+  ref.read(subscriptionProvider.notifier).refresh().ignore();
 }
 
 /// Full logout flow: clears storage, cancels in-flight requests, clears repository cache, and wipes all Riverpod notifiers.
@@ -660,29 +663,112 @@ Future<void> appLogout(dynamic ref) async {
   resetAllFinanceProviders(ref);
 }
 
-/// Pro Membership status provider
+// ============================================================
+// SUBSCRIPTION & ENTITLEMENTS STATE MANAGEMENT
+// ============================================================
+
+class SubscriptionNotifier extends Notifier<SubscriptionDetailsModel> {
+  @override
+  SubscriptionDetailsModel build() {
+    final storage = ref.watch(localStorageProvider);
+    final initial = SubscriptionDetailsModel.createDefault(isPro: storage.isProMember);
+    // Fetch authoritative state from PostgreSQL backend
+    Future.microtask(() => refresh());
+    return initial;
+  }
+
+  Future<void> refresh() async {
+    final repo = ref.read(financeRepositoryProvider);
+    try {
+      final updated = await repo.fetchSubscription();
+      state = updated;
+    } catch (_) {
+      // Keep existing state on error
+    }
+  }
+
+  void reset() {
+    state = SubscriptionDetailsModel.createDefault(isPro: false);
+  }
+
+  Future<PaymentOrderModel> createOrder({
+    required String planId,
+    required String billingCycle,
+    required String paymentMethod,
+  }) async {
+    final repo = ref.read(financeRepositoryProvider);
+    return await repo.createPaymentOrder(
+      planId: planId,
+      billingCycle: billingCycle,
+      paymentMethod: paymentMethod,
+    );
+  }
+
+  Future<void> confirmOrder(
+    String orderId, {
+    String? externalTransactionId,
+    String? paymentMethod,
+    String? notes,
+  }) async {
+    final repo = ref.read(financeRepositoryProvider);
+    final updated = await repo.confirmPaymentOrder(
+      orderId,
+      externalTransactionId: externalTransactionId,
+      paymentMethod: paymentMethod,
+      notes: notes,
+    );
+    state = updated;
+  }
+
+  Future<void> cancelSubscription() async {
+    final repo = ref.read(financeRepositoryProvider);
+    final updated = await repo.cancelSubscription();
+    state = updated;
+  }
+
+  Future<void> setProFallback(bool value) async {
+    final storage = ref.read(localStorageProvider);
+    await storage.setProMember(value);
+    state = SubscriptionDetailsModel.createDefault(isPro: value);
+  }
+}
+
+final subscriptionProvider = NotifierProvider<SubscriptionNotifier, SubscriptionDetailsModel>(() {
+  return SubscriptionNotifier();
+});
+
+final availablePlansProvider = FutureProvider<List<PlanModel>>((ref) async {
+  final repo = ref.watch(financeRepositoryProvider);
+  return await repo.fetchPlans();
+});
+
+/// Feature-based entitlement check provider
+/// Usage: ref.watch(canUseFeatureProvider('what_if_simulator'))
+final canUseFeatureProvider = Provider.family<bool, String>((ref, featureKey) {
+  final sub = ref.watch(subscriptionProvider);
+  return sub.canUse(featureKey);
+});
+
+final featureEntitlementProvider = Provider.family<EntitlementModel?, String>((ref, featureKey) {
+  final sub = ref.watch(subscriptionProvider);
+  return sub.getEntitlement(featureKey);
+});
+
+/// Pro Membership status provider (backward-compatible, driven by subscriptionProvider)
 class ProMemberNotifier extends Notifier<bool> {
   @override
   bool build() {
-    final storage = ref.watch(localStorageProvider);
-    return storage.isProMember;
-  }
-
-  Future<void> togglePro() async {
-    final next = !state;
-    state = next;
-    final storage = ref.read(localStorageProvider);
-    await storage.setProMember(next);
+    final sub = ref.watch(subscriptionProvider);
+    return sub.isPro;
   }
 
   Future<void> setPro(bool value) async {
-    state = value;
-    final storage = ref.read(localStorageProvider);
-    await storage.setProMember(value);
+    await ref.read(subscriptionProvider.notifier).setProFallback(value);
   }
 }
 
 final proMemberProvider = NotifierProvider<ProMemberNotifier, bool>(() {
   return ProMemberNotifier();
 });
+
 

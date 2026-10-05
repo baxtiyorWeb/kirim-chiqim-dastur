@@ -34,6 +34,7 @@ func main() {
 	debtH := handler.NewDebtHandler(repo)
 	goalH := handler.NewGoalHandler(repo)
 	dashH := handler.NewDashboardHandler(repo)
+	billingH := handler.NewBillingHandler(repo)
 	healthH := handler.NewHealthHandler()
 
 	mux := http.NewServeMux()
@@ -46,6 +47,9 @@ func main() {
 	mux.HandleFunc("POST /api/v1/auth/send-otp", authH.SendOTP)
 	mux.HandleFunc("POST /api/v1/auth/verify-otp", authH.VerifyOTP)
 	mux.HandleFunc("POST /api/v1/auth/complete-registration", authH.CompleteRegistration)
+	mux.HandleFunc("GET /api/v1/billing/plans", billingH.GetPlans)
+	// Order confirmation can be called directly by external webhook / Telegram bot / admin
+	mux.HandleFunc("POST /api/v1/billing/orders/{id}/confirm", billingH.ConfirmOrder)
 
 	// Protected routes helper
 	protect := middleware.Auth(cfg.JWTSecret, repo)
@@ -55,6 +59,18 @@ func main() {
 	mux.Handle("PUT /api/v1/auth/profile", protect(http.HandlerFunc(authH.UpdateProfile)))
 	mux.Handle("PUT /api/v1/auth/initial-balance", protect(http.HandlerFunc(authH.SetInitialBalance)))
 	mux.Handle("DELETE /api/v1/auth/account", protect(http.HandlerFunc(authH.DeleteAccount)))
+
+	// Billing & Subscriptions
+	mux.Handle("GET /api/v1/billing/subscription", protect(http.HandlerFunc(billingH.GetSubscription)))
+	mux.Handle("POST /api/v1/billing/orders", protect(http.HandlerFunc(billingH.CreateOrder)))
+	mux.Handle("GET /api/v1/billing/orders/{id}", protect(http.HandlerFunc(billingH.GetOrder)))
+	mux.Handle("POST /api/v1/billing/cancel", protect(http.HandlerFunc(billingH.CancelSubscription)))
+	mux.Handle("POST /api/v1/billing/admin/subscriptions", protect(http.HandlerFunc(billingH.AdminSubscription)))
+
+	// Protected Pro Actions with Entitlement & Usage Enforcement
+	mux.Handle("POST /api/v1/intelligence/what-if", protect(http.HandlerFunc(billingH.WhatIfSimulate)))
+	mux.Handle("POST /api/v1/reports/export", protect(http.HandlerFunc(billingH.ExportReport)))
+	mux.Handle("GET /api/v1/intelligence/runway", protect(http.HandlerFunc(billingH.GetRunwayForecast)))
 
 	// Transactions
 	mux.Handle("GET /api/v1/transactions", protect(http.HandlerFunc(txH.List)))

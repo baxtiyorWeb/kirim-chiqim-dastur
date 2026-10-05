@@ -886,3 +886,353 @@ func (r *PostgresRepository) GetStatistics(ctx context.Context, userID uuid.UUID
 
 	return resp, nil
 }
+
+// ============================================================
+// BILLING & SUBSCRIPTIONS
+// ============================================================
+
+func (r *PostgresRepository) GetPlans(ctx context.Context) ([]models.Plan, error) {
+	query := `
+		SELECT id, name, description, monthly_price, annual_price, currency, is_active, sort_order, created_at, updated_at
+		FROM plans
+		WHERE is_active = TRUE
+		ORDER BY sort_order ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var plans []models.Plan
+	for rows.Next() {
+		var p models.Plan
+		var desc sql.NullString
+		if err := rows.Scan(&p.ID, &p.Name, &desc, &p.MonthlyPrice, &p.AnnualPrice, &p.Currency, &p.IsActive, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if desc.Valid {
+			p.Description = desc.String
+		}
+		plans = append(plans, p)
+	}
+	return plans, nil
+}
+
+func (r *PostgresRepository) GetPlanByID(ctx context.Context, planID string) (*models.Plan, error) {
+	query := `
+		SELECT id, name, description, monthly_price, annual_price, currency, is_active, sort_order, created_at, updated_at
+		FROM plans
+		WHERE id = $1
+	`
+	var p models.Plan
+	var desc sql.NullString
+	err := r.db.QueryRowContext(ctx, query, planID).Scan(
+		&p.ID, &p.Name, &desc, &p.MonthlyPrice, &p.AnnualPrice, &p.Currency, &p.IsActive, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if desc.Valid {
+		p.Description = desc.String
+	}
+	return &p, nil
+}
+
+func (r *PostgresRepository) GetUserSubscription(ctx context.Context, userID uuid.UUID) (*models.Subscription, *models.Plan, error) {
+	query := `
+		SELECT id, user_id, plan_id, status, billing_cycle, start_date, current_period_start, current_period_end, canceled_at, created_at, updated_at
+		FROM subscriptions
+		WHERE user_id = $1
+	`
+	var sub models.Subscription
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(
+		&sub.ID, &sub.UserID, &sub.PlanID, &sub.Status, &sub.BillingCycle,
+		&sub.StartDate, &sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.CanceledAt,
+		&sub.CreatedAt, &sub.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		// Auto-initialize default free subscription
+		now := time.Now()
+		sub = models.Subscription{
+			ID:                 uuid.New(),
+			UserID:             userID,
+			PlanID:             models.PlanIDFree,
+			Status:             models.SubscriptionStatusActive,
+			BillingCycle:       models.BillingCycleNone,
+			StartDate:          now,
+			CurrentPeriodStart: now,
+			CreatedAt:          now,
+			UpdatedAt:          now,
+		}
+		insertQ := `
+			INSERT INTO subscriptions (id, user_id, plan_id, status, billing_cycle, start_date, current_period_start, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			ON CONFLICT (user_id) DO UPDATE SET updated_at = NOW()
+			RETURNING id, user_id, plan_id, status, billing_cycle, start_date, current_period_start, current_period_end, canceled_at, created_at, updated_at
+		`
+		_ = r.db.QueryRowContext(ctx, insertQ, sub.ID, sub.UserID, sub.PlanID, sub.Status, sub.BillingCycle, sub.StartDate, sub.CurrentPeriodStart, sub.CreatedAt, sub.UpdatedAt).Scan(
+			&sub.ID, &sub.UserID, &sub.PlanID, &sub.Status, &sub.BillingCycle,
+			&sub.StartDate, &sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.CanceledAt,
+			&sub.CreatedAt, &sub.UpdatedAt,
+		)
+	} else if err != nil {
+		return nil, nil, err
+	}
+
+	// Check if active subscription has expired
+	now := time.Now()
+	if sub.CurrentPeriodEnd != nil && now.After(*sub.CurrentPeriodEnd) && sub.Status == models.SubscriptionStatusActive {
+		sub.Status = models.SubscriptionStatusExpired
+		sub.UpdatedAt = now
+		_, _ = r.db.ExecContext(ctx, "UPDATE subscriptions SET status = $1, updated_at = $2 WHERE id = $3", sub.Status, sub.UpdatedAt, sub.ID)
+	}
+
+	planID := sub.PlanID
+	if sub.Status == models.SubscriptionStatusExpired || sub.Status == models.SubscriptionStatusCanceled {
+		planID = models.PlanIDFree
+	}
+
+	plan, err := r.GetPlanByID(ctx, planID)
+	if err != nil {
+		plan = &models.Plan{
+			ID:           models.PlanIDFree,
+			Name:         "Oddiy Reja",
+			MonthlyPrice: 0,
+			AnnualPrice:  0,
+			Currency:     "UZS",
+			IsActive:     true,
+		}
+	}
+
+	return &sub, plan, nil
+}
+
+func (r *PostgresRepository) UpsertSubscription(ctx context.Context, sub *models.Subscription) error {
+	now := time.Now()
+	if sub.ID == uuid.Nil {
+		sub.ID = uuid.New()
+	}
+	sub.UpdatedAt = now
+
+	query := `
+		INSERT INTO subscriptions (id, user_id, plan_id, status, billing_cycle, start_date, current_period_start, current_period_end, canceled_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		ON CONFLICT (user_id) DO UPDATE SET
+			plan_id = EXCLUDED.plan_id,
+			status = EXCLUDED.status,
+			billing_cycle = EXCLUDED.billing_cycle,
+			current_period_start = EXCLUDED.current_period_start,
+			current_period_end = EXCLUDED.current_period_end,
+			canceled_at = EXCLUDED.canceled_at,
+			updated_at = EXCLUDED.updated_at
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		sub.ID, sub.UserID, sub.PlanID, sub.Status, sub.BillingCycle,
+		sub.StartDate, sub.CurrentPeriodStart, sub.CurrentPeriodEnd, sub.CanceledAt,
+		now, now,
+	)
+	return err
+}
+
+func (r *PostgresRepository) CancelSubscription(ctx context.Context, userID uuid.UUID) error {
+	now := time.Now()
+	query := `
+		UPDATE subscriptions
+		SET status = $1, canceled_at = $2, updated_at = $2
+		WHERE user_id = $3
+	`
+	res, err := r.db.ExecContext(ctx, query, models.SubscriptionStatusCanceled, now, userID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil || rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ============================================================
+// PAYMENT ORDERS
+// ============================================================
+
+func (r *PostgresRepository) CreatePaymentOrder(ctx context.Context, order *models.PaymentOrder) error {
+	now := time.Now()
+	if order.ID == uuid.Nil {
+		order.ID = uuid.New()
+	}
+	order.CreatedAt = now
+	order.UpdatedAt = now
+
+	metaJSON := "{}"
+	if order.Metadata != "" {
+		metaJSON = order.Metadata
+	}
+
+	query := `
+		INSERT INTO payment_orders (id, user_id, plan_id, billing_cycle, amount, currency, status, payment_method, external_transaction_id, paid_at, expires_at, notes, metadata, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		order.ID, order.UserID, order.PlanID, order.BillingCycle, order.Amount,
+		order.Currency, order.Status, order.PaymentMethod, order.ExternalTransactionID,
+		order.PaidAt, order.ExpiresAt, order.Notes, metaJSON, now, now,
+	)
+	return err
+}
+
+func (r *PostgresRepository) GetPaymentOrderByID(ctx context.Context, orderID uuid.UUID) (*models.PaymentOrder, error) {
+	query := `
+		SELECT id, user_id, plan_id, billing_cycle, amount, currency, status, payment_method, external_transaction_id, paid_at, expires_at, notes, metadata::text, created_at, updated_at
+		FROM payment_orders
+		WHERE id = $1
+	`
+	var o models.PaymentOrder
+	var notes sql.NullString
+	var meta sql.NullString
+	err := r.db.QueryRowContext(ctx, query, orderID).Scan(
+		&o.ID, &o.UserID, &o.PlanID, &o.BillingCycle, &o.Amount,
+		&o.Currency, &o.Status, &o.PaymentMethod, &o.ExternalTransactionID,
+		&o.PaidAt, &o.ExpiresAt, &notes, &meta, &o.CreatedAt, &o.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if notes.Valid {
+		o.Notes = notes.String
+	}
+	if meta.Valid {
+		o.Metadata = meta.String
+	}
+	return &o, nil
+}
+
+func (r *PostgresRepository) GetPaymentOrderByExternalTx(ctx context.Context, extTxID string) (*models.PaymentOrder, error) {
+	query := `
+		SELECT id, user_id, plan_id, billing_cycle, amount, currency, status, payment_method, external_transaction_id, paid_at, expires_at, notes, metadata::text, created_at, updated_at
+		FROM payment_orders
+		WHERE external_transaction_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	var o models.PaymentOrder
+	var notes sql.NullString
+	var meta sql.NullString
+	err := r.db.QueryRowContext(ctx, query, extTxID).Scan(
+		&o.ID, &o.UserID, &o.PlanID, &o.BillingCycle, &o.Amount,
+		&o.Currency, &o.Status, &o.PaymentMethod, &o.ExternalTransactionID,
+		&o.PaidAt, &o.ExpiresAt, &notes, &meta, &o.CreatedAt, &o.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if notes.Valid {
+		o.Notes = notes.String
+	}
+	if meta.Valid {
+		o.Metadata = meta.String
+	}
+	return &o, nil
+}
+
+func (r *PostgresRepository) UpdatePaymentOrder(ctx context.Context, order *models.PaymentOrder) error {
+	now := time.Now()
+	order.UpdatedAt = now
+	metaJSON := "{}"
+	if order.Metadata != "" {
+		metaJSON = order.Metadata
+	}
+
+	query := `
+		UPDATE payment_orders
+		SET status = $1, external_transaction_id = $2, paid_at = $3, notes = $4, metadata = $5::jsonb, updated_at = $6
+		WHERE id = $7
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		order.Status, order.ExternalTransactionID, order.PaidAt, order.Notes, metaJSON, now, order.ID,
+	)
+	return err
+}
+
+func (r *PostgresRepository) ListUserPaymentOrders(ctx context.Context, userID uuid.UUID, limit int) ([]models.PaymentOrder, error) {
+	query := `
+		SELECT id, user_id, plan_id, billing_cycle, amount, currency, status, payment_method, external_transaction_id, paid_at, expires_at, notes, metadata::text, created_at, updated_at
+		FROM payment_orders
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []models.PaymentOrder
+	for rows.Next() {
+		var o models.PaymentOrder
+		var notes sql.NullString
+		var meta sql.NullString
+		if err := rows.Scan(
+			&o.ID, &o.UserID, &o.PlanID, &o.BillingCycle, &o.Amount,
+			&o.Currency, &o.Status, &o.PaymentMethod, &o.ExternalTransactionID,
+			&o.PaidAt, &o.ExpiresAt, &notes, &meta, &o.CreatedAt, &o.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if notes.Valid {
+			o.Notes = notes.String
+		}
+		if meta.Valid {
+			o.Metadata = meta.String
+		}
+		orders = append(orders, o)
+	}
+	return orders, nil
+}
+
+// ============================================================
+// ENTITLEMENTS & USAGE TRACKING
+// ============================================================
+
+func (r *PostgresRepository) GetFeatureUsage(ctx context.Context, userID uuid.UUID, featureKey, periodKey string) (int, error) {
+	query := `
+		SELECT usage_count
+		FROM feature_usages
+		WHERE user_id = $1 AND feature_key = $2 AND period_key = $3
+	`
+	var count int
+	err := r.db.QueryRowContext(ctx, query, userID, featureKey, periodKey).Scan(&count)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return count, err
+}
+
+func (r *PostgresRepository) IncrementFeatureUsage(ctx context.Context, userID uuid.UUID, featureKey, periodKey string, amount int) (int, error) {
+	query := `
+		INSERT INTO feature_usages (id, user_id, feature_key, period_key, usage_count, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+		ON CONFLICT (user_id, feature_key, period_key)
+		DO UPDATE SET usage_count = feature_usages.usage_count + $5, updated_at = NOW()
+		RETURNING usage_count
+	`
+	var newCount int
+	err := r.db.QueryRowContext(ctx, query, uuid.New(), userID, featureKey, periodKey, amount).Scan(&newCount)
+	return newCount, err
+}
+

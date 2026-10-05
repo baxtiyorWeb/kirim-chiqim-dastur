@@ -9,6 +9,7 @@ import '../models/dashboard_summary.dart';
 import '../models/statistics_response.dart';
 import '../models/user_profile.dart';
 import '../models/category_item.dart';
+import '../models/billing_models.dart';
 import '../services/local_storage_service.dart';
 
 /// Single source of truth repository connecting Flutter state directly to Go backend and PostgreSQL.
@@ -816,5 +817,103 @@ class FinanceRepository {
 
   Future<void> clearAllData() async {
     await logout();
+  }
+
+  // -------------------------------------------------------------
+  // BILLING, SUBSCRIPTIONS & ENTITLEMENTS (PostgreSQL & Backend)
+  // -------------------------------------------------------------
+
+  SubscriptionDetailsModel _subscriptionDetails = SubscriptionDetailsModel.createDefault();
+  SubscriptionDetailsModel get subscriptionDetails => _subscriptionDetails;
+
+  Future<List<PlanModel>> fetchPlans() async {
+    try {
+      final res = await _api.get(ApiConstants.billingPlans);
+      if (res is Map && res['plans'] is List) {
+        return (res['plans'] as List).map((p) => PlanModel.fromJson(p as Map<String, dynamic>)).toList();
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchPlans error: $e');
+    }
+    return [PlanModel.freeDefault, PlanModel.proDefault];
+  }
+
+  Future<SubscriptionDetailsModel> fetchSubscription() async {
+    try {
+      final res = await _api.get(ApiConstants.billingSubscription);
+      if (res is Map<String, dynamic>) {
+        _subscriptionDetails = SubscriptionDetailsModel.fromJson(res);
+        await _storage.setProMember(_subscriptionDetails.isPro);
+        return _subscriptionDetails;
+      }
+    } catch (e) {
+      debugPrint('[FinanceRepository] fetchSubscription error (using local cache): $e');
+    }
+    _subscriptionDetails = SubscriptionDetailsModel.createDefault(isPro: _storage.isProMember);
+    return _subscriptionDetails;
+  }
+
+  Future<PaymentOrderModel> createPaymentOrder({
+    required String planId,
+    required String billingCycle,
+    required String paymentMethod,
+  }) async {
+    final res = await _api.post(ApiConstants.billingOrders, body: {
+      'planId': planId,
+      'billingCycle': billingCycle,
+      'paymentMethod': paymentMethod,
+    });
+    return PaymentOrderModel.fromJson(res as Map<String, dynamic>);
+  }
+
+  Future<PaymentOrderModel> getPaymentOrder(String orderId) async {
+    final res = await _api.get('${ApiConstants.billingOrders}/$orderId');
+    return PaymentOrderModel.fromJson(res as Map<String, dynamic>);
+  }
+
+  Future<SubscriptionDetailsModel> confirmPaymentOrder(
+    String orderId, {
+    String? externalTransactionId,
+    String? paymentMethod,
+    String? notes,
+  }) async {
+    final body = <String, dynamic>{};
+    if (externalTransactionId != null) body['externalTransactionId'] = externalTransactionId;
+    if (paymentMethod != null) body['paymentMethod'] = paymentMethod;
+    if (notes != null) body['notes'] = notes;
+    final res = await _api.post('${ApiConstants.billingOrders}/$orderId/confirm', body: body);
+    if (res is Map && res['subscription'] is Map) {
+      _subscriptionDetails = SubscriptionDetailsModel.fromJson(res['subscription'] as Map<String, dynamic>);
+      await _storage.setProMember(_subscriptionDetails.isPro);
+    } else {
+      await fetchSubscription();
+    }
+    return _subscriptionDetails;
+  }
+
+  Future<SubscriptionDetailsModel> cancelSubscription() async {
+    final res = await _api.post(ApiConstants.billingCancel);
+    if (res is Map && res['subscription'] is Map) {
+      _subscriptionDetails = SubscriptionDetailsModel.fromJson(res['subscription'] as Map<String, dynamic>);
+      await _storage.setProMember(_subscriptionDetails.isPro);
+    } else {
+      await fetchSubscription();
+    }
+    return _subscriptionDetails;
+  }
+
+  Future<Map<String, dynamic>> evaluateWhatIf({required int plannedExpense, String? title}) async {
+    final res = await _api.post(ApiConstants.intelligenceWhatIf, body: {
+      'plannedExpense': plannedExpense,
+      'title': title ?? '',
+    });
+    // Refresh subscription to reflect updated usage
+    fetchSubscription().ignore();
+    return res as Map<String, dynamic>;
+  }
+
+  Future<void> authorizeExport() async {
+    await _api.post(ApiConstants.reportsExport);
+    fetchSubscription().ignore();
   }
 }

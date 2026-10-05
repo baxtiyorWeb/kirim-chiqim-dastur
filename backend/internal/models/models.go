@@ -140,3 +140,132 @@ type StatisticsResponse struct {
 	CategoryExpenses []CategoryStat `json:"categoryExpenses"`
 	CategoryIncomes  []CategoryStat `json:"categoryIncomes"`
 }
+
+// ============================================================
+// BILLING, PLANS, SUBSCRIPTIONS & ENTITLEMENTS
+// ============================================================
+
+const (
+	PlanIDFree = "free"
+	PlanIDPro  = "pro"
+
+	SubscriptionStatusActive   = "active"
+	SubscriptionStatusExpired  = "expired"
+	SubscriptionStatusCanceled = "canceled"
+	SubscriptionStatusTrialing = "trialing"
+
+	BillingCycleNone     = "none"
+	BillingCycleMonthly  = "monthly"
+	BillingCycleAnnual   = "annual"
+	BillingCycleLifetime = "lifetime"
+
+	OrderStatusPending  = "pending"
+	OrderStatusPaid     = "paid"
+	OrderStatusFailed   = "failed"
+	OrderStatusExpired  = "expired"
+	OrderStatusCanceled = "canceled"
+
+	PaymentMethodManual       = "manual"
+	PaymentMethodTelegram     = "telegram"
+	PaymentMethodLocal        = "local"
+	PaymentMethodLocalClick   = "local_click"
+	PaymentMethodLocalPayme   = "local_payme"
+	PaymentMethodBankTransfer = "bank_transfer"
+
+	FeatureWhatIfSimulator       = "what_if_simulator"
+	FeatureDailyBudgetBreakdown  = "intelligence_daily_budget"
+	FeatureRunwayForecast        = "runway_forecast"
+	FeatureExportReports         = "export_reports"
+	FeatureCloudSync             = "cloud_sync"
+)
+
+// Plan represents an available subscription tier
+type Plan struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	MonthlyPrice int64     `json:"monthlyPrice"`
+	AnnualPrice  int64     `json:"annualPrice"`
+	Currency     string    `json:"currency"`
+	IsActive     bool      `json:"isActive"`
+	SortOrder    int       `json:"sortOrder"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+}
+
+// Subscription represents a user's plan state and active period
+type Subscription struct {
+	ID                 uuid.UUID  `json:"id"`
+	UserID             uuid.UUID  `json:"userId"`
+	PlanID             string     `json:"planId"`
+	Status             string     `json:"status"` // active, expired, canceled, trialing
+	BillingCycle       string     `json:"billingCycle"` // none, monthly, annual, lifetime
+	StartDate          time.Time  `json:"startDate"`
+	CurrentPeriodStart time.Time  `json:"currentPeriodStart"`
+	CurrentPeriodEnd   *time.Time `json:"currentPeriodEnd,omitempty"`
+	CanceledAt         *time.Time `json:"canceledAt,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+}
+
+// PaymentOrder represents an individual checkout or payment invoice
+type PaymentOrder struct {
+	ID                    uuid.UUID  `json:"id"`
+	UserID                uuid.UUID  `json:"userId"`
+	PlanID                string     `json:"planId"`
+	BillingCycle          string     `json:"billingCycle"` // monthly, annual
+	Amount                int64      `json:"amount"`
+	Currency              string     `json:"currency"`
+	Status                string     `json:"status"` // pending, paid, failed, expired, canceled
+	PaymentMethod         string     `json:"paymentMethod"`
+	ExternalTransactionID *string    `json:"externalTransactionId,omitempty"`
+	PaidAt                *time.Time `json:"paidAt,omitempty"`
+	ExpiresAt             time.Time  `json:"expiresAt"`
+	Notes                 string     `json:"notes,omitempty"`
+	Metadata              string     `json:"metadata,omitempty"`
+	PaymentURL            string     `json:"paymentUrl,omitempty"`
+	BotDeepLink           string     `json:"botDeepLink,omitempty"`
+	CreatedAt             time.Time  `json:"createdAt"`
+	UpdatedAt             time.Time  `json:"updatedAt"`
+}
+
+// Entitlement defines whether a feature is permitted and what limits apply
+type Entitlement struct {
+	FeatureKey   string `json:"featureKey"`
+	IsEntitled   bool   `json:"isEntitled"`
+	Limit        int    `json:"limit"`        // -1 = unlimited, 0 = locked/disallowed, >0 = limit count
+	CurrentUsage int    `json:"currentUsage"` // count used in current period
+	Remaining    int    `json:"remaining"`    // -1 = unlimited, 0 = exhausted
+	Period       string `json:"period"`       // e.g. "2026-10" or "lifetime"
+}
+
+// SubscriptionDetailsResponse provides a comprehensive subscription view
+type SubscriptionDetailsResponse struct {
+	Plan         Plan                   `json:"plan"`
+	Subscription Subscription           `json:"subscription"`
+	IsPro        bool                   `json:"isPro"`
+	Entitlements map[string]Entitlement `json:"entitlements"`
+}
+
+// CreateOrderRequest is the payload to initialize a payment order
+type CreateOrderRequest struct {
+	PlanID        string `json:"planId"`
+	BillingCycle  string `json:"billingCycle"` // monthly or annual
+	PaymentMethod string `json:"paymentMethod"`
+}
+
+// ConfirmOrderRequest is used by backend, webhook or Telegram bot to confirm payment
+type ConfirmOrderRequest struct {
+	ExternalTransactionID string `json:"externalTransactionId"`
+	PaymentMethod         string `json:"paymentMethod,omitempty"`
+	Notes                 string `json:"notes,omitempty"`
+}
+
+// AdminSubscriptionRequest allows manual admin upgrade/grant
+type AdminSubscriptionRequest struct {
+	UserID       uuid.UUID `json:"userId"`
+	PlanID       string    `json:"planId"`
+	BillingCycle string    `json:"billingCycle"`
+	DurationDays int       `json:"durationDays"`
+}
+

@@ -59,4 +59,23 @@ type Repository interface {
 	// Dashboard & Stats
 	GetDashboardSummary(ctx context.Context, userID uuid.UUID) (*models.DashboardSummary, error)
 	GetStatistics(ctx context.Context, userID uuid.UUID, period string) (*models.StatisticsResponse, error)
+
+	// Billing, Plans & Subscriptions
+	GetPlans(ctx context.Context) ([]models.Plan, error)
+	GetPlanByID(ctx context.Context, planID string) (*models.Plan, error)
+	GetUserSubscription(ctx context.Context, userID uuid.UUID) (*models.Subscription, *models.Plan, error)
+	UpsertSubscription(ctx context.Context, sub *models.Subscription) error
+	CancelSubscription(ctx context.Context, userID uuid.UUID) error
+
+	// Payment Orders
+	CreatePaymentOrder(ctx context.Context, order *models.PaymentOrder) error
+	GetPaymentOrderByID(ctx context.Context, orderID uuid.UUID) (*models.PaymentOrder, error)
+	GetPaymentOrderByExternalTx(ctx context.Context, extTxID string) (*models.PaymentOrder, error)
+	UpdatePaymentOrder(ctx context.Context, order *models.PaymentOrder) error
+	ListUserPaymentOrders(ctx context.Context, userID uuid.UUID, limit int) ([]models.PaymentOrder, error)
+
+	// Entitlements & Usage Tracking
+	GetFeatureUsage(ctx context.Context, userID uuid.UUID, featureKey, periodKey string) (int, error)
+	IncrementFeatureUsage(ctx context.Context, userID uuid.UUID, featureKey, periodKey string, amount int) (int, error)
 }
+

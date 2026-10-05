@@ -38,6 +38,7 @@ class ProfileScreen extends ConsumerWidget {
         onRefresh: () async {
           await ref.read(userProfileProvider.notifier).refresh();
           await ref.read(dashboardSummaryProvider.notifier).refresh();
+          await ref.read(subscriptionProvider.notifier).refresh();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -310,15 +311,25 @@ class ProfileScreen extends ConsumerWidget {
                               ],
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              isPro
-                                  ? 'Ta\'rifni boshqarish yoki imtiyozlarni ko\'rish'
-                                  : 'Xarid hisobi va oylik tahlillar',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colors.textSecondary,
-                              ),
-                            ),
+                            Builder(builder: (context) {
+                              final subState = ref.watch(subscriptionProvider);
+                              final exp = subState.subscription.currentPeriodEnd;
+                              if (isPro && exp != null) {
+                                return Text(
+                                  'Amal qilish muddati: ${exp.day}.${exp.month.toString().padLeft(2, '0')}.${exp.year}',
+                                  style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                                );
+                              }
+                              return Text(
+                                isPro
+                                    ? 'Ta\'rifni boshqarish yoki imtiyozlarni ko\'rish'
+                                    : 'Xarid hisobi va oylik tahlillar',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colors.textSecondary,
+                                ),
+                              );
+                            }),
                           ],
                         ),
                       ),

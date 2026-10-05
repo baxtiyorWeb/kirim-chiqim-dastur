@@ -13,21 +13,55 @@ import (
 )
 
 type MemoryRepository struct {
-	mu           sync.RWMutex
-	users        map[uuid.UUID]*models.User
-	transactions map[uuid.UUID]*models.Transaction
-	budgets      map[string]*models.Budget // key: userID:yearMonth
-	debts        map[uuid.UUID]*models.Debt
-	goals        map[uuid.UUID]*models.SavingsGoal
+	mu            sync.RWMutex
+	users         map[uuid.UUID]*models.User
+	transactions  map[uuid.UUID]*models.Transaction
+	budgets       map[string]*models.Budget // key: userID:yearMonth
+	debts         map[uuid.UUID]*models.Debt
+	goals         map[uuid.UUID]*models.SavingsGoal
+	plans         map[string]*models.Plan
+	subscriptions map[uuid.UUID]*models.Subscription
+	paymentOrders map[uuid.UUID]*models.PaymentOrder
+	featureUsages map[string]int // key: userID:featureKey:periodKey
 }
 
 func NewMemoryRepository() *MemoryRepository {
+	now := time.Now()
 	return &MemoryRepository{
 		users:        make(map[uuid.UUID]*models.User),
 		transactions: make(map[uuid.UUID]*models.Transaction),
 		budgets:      make(map[string]*models.Budget),
 		debts:        make(map[uuid.UUID]*models.Debt),
 		goals:        make(map[uuid.UUID]*models.SavingsGoal),
+		plans: map[string]*models.Plan{
+			models.PlanIDFree: {
+				ID:           models.PlanIDFree,
+				Name:         "Oddiy Reja",
+				Description:  "Asosiy daromad-xarajat hisobi va cheklangan tahlillar",
+				MonthlyPrice: 0,
+				AnnualPrice:  0,
+				Currency:     "UZS",
+				IsActive:     true,
+				SortOrder:    1,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			},
+			models.PlanIDPro: {
+				ID:           models.PlanIDPro,
+				Name:         "Pro Intellekt",
+				Description:  "Cheksiz AI qaror tahlili, dinamik xarajat me'yori va eksport",
+				MonthlyPrice: 19000,
+				AnnualPrice:  149000,
+				Currency:     "UZS",
+				IsActive:     true,
+				SortOrder:    2,
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			},
+		},
+		subscriptions: make(map[uuid.UUID]*models.Subscription),
+		paymentOrders: make(map[uuid.UUID]*models.PaymentOrder),
+		featureUsages: make(map[string]int),
 	}
 }
 
@@ -632,3 +666,200 @@ func (m *MemoryRepository) GetStatistics(ctx context.Context, userID uuid.UUID, 
 
 	return resp, nil
 }
+
+// ============================================================
+// BILLING & SUBSCRIPTIONS
+// ============================================================
+
+func (m *MemoryRepository) GetPlans(ctx context.Context) ([]models.Plan, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var list []models.Plan
+	for _, p := range m.plans {
+		if p.IsActive {
+			list = append(list, *p)
+		}
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].SortOrder < list[j].SortOrder
+	})
+	return list, nil
+}
+
+func (m *MemoryRepository) GetPlanByID(ctx context.Context, planID string) (*models.Plan, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	p, ok := m.plans[planID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	copy := *p
+	return &copy, nil
+}
+
+func (m *MemoryRepository) GetUserSubscription(ctx context.Context, userID uuid.UUID) (*models.Subscription, *models.Plan, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	sub, ok := m.subscriptions[userID]
+	if !ok {
+		// Auto-initialize default free subscription
+		now := time.Now()
+		sub = &models.Subscription{
+			ID:                 uuid.New(),
+			UserID:             userID,
+			PlanID:             models.PlanIDFree,
+			Status:             models.SubscriptionStatusActive,
+			BillingCycle:       models.BillingCycleNone,
+			StartDate:          now,
+			CurrentPeriodStart: now,
+			CreatedAt:          now,
+			UpdatedAt:          now,
+		}
+		m.subscriptions[userID] = sub
+	} else {
+		// Check for expiration
+		now := time.Now()
+		if sub.CurrentPeriodEnd != nil && now.After(*sub.CurrentPeriodEnd) && sub.Status == models.SubscriptionStatusActive {
+			sub.Status = models.SubscriptionStatusExpired
+			sub.UpdatedAt = now
+		}
+	}
+
+	planID := sub.PlanID
+	// If subscription is expired or canceled, downgrade access to Free
+	if sub.Status == models.SubscriptionStatusExpired || sub.Status == models.SubscriptionStatusCanceled {
+		planID = models.PlanIDFree
+	}
+
+	plan, ok := m.plans[planID]
+	if !ok {
+		plan = m.plans[models.PlanIDFree]
+	}
+
+	subCopy := *sub
+	planCopy := *plan
+	return &subCopy, &planCopy, nil
+}
+
+func (m *MemoryRepository) UpsertSubscription(ctx context.Context, sub *models.Subscription) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	sub.UpdatedAt = time.Now()
+	if sub.ID == uuid.Nil {
+		sub.ID = uuid.New()
+	}
+	m.subscriptions[sub.UserID] = sub
+	return nil
+}
+
+func (m *MemoryRepository) CancelSubscription(ctx context.Context, userID uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	sub, ok := m.subscriptions[userID]
+	if !ok {
+		return ErrNotFound
+	}
+	now := time.Now()
+	sub.Status = models.SubscriptionStatusCanceled
+	sub.CanceledAt = &now
+	sub.UpdatedAt = now
+	return nil
+}
+
+// ============================================================
+// PAYMENT ORDERS
+// ============================================================
+
+func (m *MemoryRepository) CreatePaymentOrder(ctx context.Context, order *models.PaymentOrder) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if order.ID == uuid.Nil {
+		order.ID = uuid.New()
+	}
+	now := time.Now()
+	order.CreatedAt = now
+	order.UpdatedAt = now
+	m.paymentOrders[order.ID] = order
+	return nil
+}
+
+func (m *MemoryRepository) GetPaymentOrderByID(ctx context.Context, orderID uuid.UUID) (*models.PaymentOrder, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	order, ok := m.paymentOrders[orderID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	copy := *order
+	return &copy, nil
+}
+
+func (m *MemoryRepository) GetPaymentOrderByExternalTx(ctx context.Context, extTxID string) (*models.PaymentOrder, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, o := range m.paymentOrders {
+		if o.ExternalTransactionID != nil && *o.ExternalTransactionID == extTxID {
+			copy := *o
+			return &copy, nil
+		}
+	}
+	return nil, ErrNotFound
+}
+
+func (m *MemoryRepository) UpdatePaymentOrder(ctx context.Context, order *models.PaymentOrder) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	order.UpdatedAt = time.Now()
+	m.paymentOrders[order.ID] = order
+	return nil
+}
+
+func (m *MemoryRepository) ListUserPaymentOrders(ctx context.Context, userID uuid.UUID, limit int) ([]models.PaymentOrder, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var list []models.PaymentOrder
+	for _, o := range m.paymentOrders {
+		if o.UserID == userID {
+			list = append(list, *o)
+		}
+	}
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].CreatedAt.After(list[j].CreatedAt)
+	})
+	if limit > 0 && len(list) > limit {
+		list = list[:limit]
+	}
+	return list, nil
+}
+
+// ============================================================
+// ENTITLEMENTS & USAGE TRACKING
+// ============================================================
+
+func (m *MemoryRepository) GetFeatureUsage(ctx context.Context, userID uuid.UUID, featureKey, periodKey string) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	key := fmt.Sprintf("%s:%s:%s", userID, featureKey, periodKey)
+	return m.featureUsages[key], nil
+}
+
+func (m *MemoryRepository) IncrementFeatureUsage(ctx context.Context, userID uuid.UUID, featureKey, periodKey string, amount int) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	key := fmt.Sprintf("%s:%s:%s", userID, featureKey, periodKey)
+	m.featureUsages[key] += amount
+	return m.featureUsages[key], nil
+}
+

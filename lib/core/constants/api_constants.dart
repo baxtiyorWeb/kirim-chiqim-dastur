@@ -30,4 +30,16 @@ class ApiConstants {
   static const String budgetCategoryLimit = '/api/v1/budget/categories';
   static const String debts = '/api/v1/debts';
   static const String goals = '/api/v1/goals';
+
+  // Billing, Subscriptions & Entitlements
+  static const String billingPlans = '/api/v1/billing/plans';
+  static const String billingSubscription = '/api/v1/billing/subscription';
+  static const String billingOrders = '/api/v1/billing/orders';
+  static const String billingCancel = '/api/v1/billing/cancel';
+
+  // Pro-guarded actions
+  static const String intelligenceWhatIf = '/api/v1/intelligence/what-if';
+  static const String intelligenceRunway = '/api/v1/intelligence/runway';
+  static const String reportsExport = '/api/v1/reports/export';
 }
+

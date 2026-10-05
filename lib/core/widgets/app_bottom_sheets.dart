@@ -11,6 +11,7 @@ import '../../data/models/category_item.dart';
 import '../../data/models/debt_item.dart';
 import '../../data/models/transaction_item.dart';
 import '../../providers/finance_providers.dart';
+import 'paywall_sheet.dart';
 
 /// Standard modal bottom sheet wrapper adhering to Material 3 design and fully responsive to keyboard
 Future<T?> showAppModalBottomSheet<T>({
@@ -393,24 +394,45 @@ void showExportBottomSheet(BuildContext context, WidgetRef ref) {
                   width: double.infinity,
                   height: AppDimensions.buttonHeight,
                   child: ElevatedButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
+                      final sub = ref.read(subscriptionProvider);
+                      if (!sub.canUse('export_reports')) {
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          await showPaywallSheet(context, featureKey: 'export_reports');
+                        }
+                        return;
+                      }
+
                       final repo = ref.read(financeRepositoryProvider);
+                      try {
+                        await repo.authorizeExport();
+                      } catch (e) {
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          await showPaywallSheet(context, featureKey: 'export_reports');
+                        }
+                        return;
+                      }
+
                       final csvContent = repo.generateCsvReport(
                         includeExpenses: includeExpenses,
                         includeIncome: includeIncome,
                         includeDebts: includeDebts,
                       );
-                      Navigator.pop(ctx);
-                      HapticUtil.success();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'CSV hisobot muvaffaqiyatli shakllantirildi (${csvContent.split('\n').length} qator)',
+                      if (context.mounted) {
+                        Navigator.pop(ctx);
+                        HapticUtil.success();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'CSV hisobot muvaffaqiyatli shakllantirildi (${csvContent.split('\n').length} qator)',
+                            ),
+                            backgroundColor: AppColors.primary,
+                            behavior: SnackBarBehavior.floating,
                           ),
-                          backgroundColor: AppColors.primary,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                        );
+                      }
                     },
                     icon: const Icon(Icons.file_download_outlined, color: Colors.white),
                     label: const Text('CSV formatda yuklash', style: TextStyle(fontWeight: FontWeight.w700)),
