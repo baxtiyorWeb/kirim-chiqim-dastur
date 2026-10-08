@@ -146,7 +146,11 @@ class ApiClient {
 
     // 401 Unauthorized Session Handling
     if (response.statusCode == 401) {
-      onUnauthorized?.call();
+      if (onUnauthorized != null) {
+        Future.microtask(() {
+          onUnauthorized?.call();
+        });
+      }
       throw ApiException('Seans muddati tugadi. Iltimos, qayta kiring.', 401);
     }
 

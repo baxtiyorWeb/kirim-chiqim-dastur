@@ -20,7 +20,11 @@ final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
   final storage = ref.watch(localStorageProvider);
   final repo = FinanceRepository(storage);
   repo.onLogout = () {
-    resetAllFinanceProviders(ref);
+    // Postpone provider reset to the next frame to prevent circular dependency
+    // collisions during active build or microtask response handling.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      resetAllFinanceProviders(ref);
+    });
   };
   return repo;
 });
@@ -46,20 +50,20 @@ final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(() {
 
 // User Profile Notifier (Direct from /api/v1/auth/me)
 class UserProfileNotifier extends Notifier<UserProfile> {
+  int _requestGeneration = 0;
+
   @override
   UserProfile build() {
     final repo = ref.watch(financeRepositoryProvider);
     // Asynchronously fetch fresh profile if authenticated
     if (repo.isAuthenticated) {
-      Future.microtask(() async {
-        final profile = await repo.fetchProfile();
-        state = profile;
-      });
+      Future.microtask(() => refresh());
     }
     return repo.userProfile;
   }
 
   void reset([UserProfile? profile]) {
+    _requestGeneration++;
     state = profile ?? UserProfile.guest();
   }
 
@@ -69,9 +73,14 @@ class UserProfileNotifier extends Notifier<UserProfile> {
       state = UserProfile.guest();
       return;
     }
-    final profile = await repo.fetchProfile();
-    if (repo.isAuthenticated) {
-      state = profile;
+    final currentGen = ++_requestGeneration;
+    try {
+      final profile = await repo.fetchProfile();
+      if (currentGen == _requestGeneration && repo.isAuthenticated) {
+        state = profile;
+      }
+    } catch (_) {
+      // Prevent unhandled network failure from corrupting state
     }
   }
 
@@ -668,26 +677,39 @@ Future<void> appLogout(dynamic ref) async {
 // ============================================================
 
 class SubscriptionNotifier extends Notifier<SubscriptionDetailsModel> {
+  int _requestGeneration = 0;
+
   @override
   SubscriptionDetailsModel build() {
     final storage = ref.watch(localStorageProvider);
     final initial = SubscriptionDetailsModel.createDefault(isPro: storage.isProMember);
-    // Fetch authoritative state from PostgreSQL backend
-    Future.microtask(() => refresh());
+    final repo = ref.watch(financeRepositoryProvider);
+    // Fetch authoritative state from PostgreSQL backend only when authenticated
+    if (repo.isAuthenticated) {
+      Future.microtask(() => refresh());
+    }
     return initial;
   }
 
   Future<void> refresh() async {
     final repo = ref.read(financeRepositoryProvider);
+    if (!repo.isAuthenticated) {
+      state = SubscriptionDetailsModel.createDefault(isPro: false);
+      return;
+    }
+    final currentGen = ++_requestGeneration;
     try {
       final updated = await repo.fetchSubscription();
-      state = updated;
+      if (currentGen == _requestGeneration && repo.isAuthenticated) {
+        state = updated;
+      }
     } catch (_) {
       // Keep existing state on error
     }
   }
 
   void reset() {
+    _requestGeneration++;
     state = SubscriptionDetailsModel.createDefault(isPro: false);
   }
 

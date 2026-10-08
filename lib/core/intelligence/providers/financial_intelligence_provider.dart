@@ -39,7 +39,6 @@ final financialIntelligenceProvider = Provider<FinancialHealthState>((ref) {
   final budget = ref.watch(budgetProvider);
   final debts = ref.watch(debtsProvider);
   final goals = ref.watch(goalsProvider);
-  final transactions = ref.watch(transactionsProvider);
   final decisionsCount = ref.watch(evaluatedDecisionsCountProvider);
 
   final now = DateTime.now();

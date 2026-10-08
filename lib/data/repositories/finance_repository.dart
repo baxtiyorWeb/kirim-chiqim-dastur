@@ -32,11 +32,19 @@ class FinanceRepository {
   bool _isInitialized = false;
   VoidCallback? onLogout;
 
+  bool _isHandlingUnauthorized = false;
+
   FinanceRepository(this._storage, [ApiClient? api])
       : _api = api ?? ApiClient(_storage) {
-    _api.onUnauthorized = () {
-      logout();
-      onLogout?.call();
+    _api.onUnauthorized = () async {
+      if (_isHandlingUnauthorized) return;
+      _isHandlingUnauthorized = true;
+      try {
+        await logout();
+        onLogout?.call();
+      } finally {
+        _isHandlingUnauthorized = false;
+      }
     };
   }
 
@@ -839,6 +847,10 @@ class FinanceRepository {
   }
 
   Future<SubscriptionDetailsModel> fetchSubscription() async {
+    if (!isAuthenticated) {
+      _subscriptionDetails = SubscriptionDetailsModel.createDefault(isPro: _storage.isProMember);
+      return _subscriptionDetails;
+    }
     try {
       final res = await _api.get(ApiConstants.billingSubscription);
       if (res is Map<String, dynamic>) {
