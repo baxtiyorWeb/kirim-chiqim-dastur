@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_dimensions.dart';
 import '../utils/currency_formatter.dart';
 import '../utils/haptic_feedback_util.dart';
+import '../monetization/monetization_analytics.dart';
+import '../payment/payment_types.dart';
 import '../../providers/finance_providers.dart';
 import '../../data/models/billing_models.dart';
 
@@ -45,11 +46,22 @@ class PaywallSheet extends ConsumerStatefulWidget {
 
 class _PaywallSheetState extends ConsumerState<PaywallSheet> {
   bool _isAnnual = true;
-  String _selectedMethod = 'manual'; // 'manual', 'telegram', 'local'
+  PaymentProviderType _selectedProvider = PaymentProviderType.click;
   bool _isLoading = false;
 
   static const int _monthlyPrice = 19000;
   static const int _annualPrice = 149000;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(monetizationAnalyticsProvider).logPaywallView(
+            featureKey: widget.featureKey,
+            source: 'paywall_sheet',
+          );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,8 +152,22 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _periodTab('Oylik', !_isAnnual, () => setState(() => _isAnnual = false)),
-                  _periodTab('Yillik (-35%)', _isAnnual, () => setState(() => _isAnnual = true)),
+                  _periodTab('Oylik', !_isAnnual, () {
+                    setState(() => _isAnnual = false);
+                    ref.read(monetizationAnalyticsProvider).logPlanSelected(
+                          planId: 'pro',
+                          cycle: 'monthly',
+                          priceUzs: _monthlyPrice,
+                        );
+                  }),
+                  _periodTab('Yillik (-35%)', _isAnnual, () {
+                    setState(() => _isAnnual = true);
+                    ref.read(monetizationAnalyticsProvider).logPlanSelected(
+                          planId: 'pro',
+                          cycle: 'annual',
+                          priceUzs: _annualPrice,
+                        );
+                  }),
                 ],
               ),
             ),
@@ -186,11 +212,35 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
             ],
             const SizedBox(height: 16),
 
-            // Payment Methods Selection
+            // Cloud & Storage Guarantee Highlight
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF007A55).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
+                border: Border.all(color: const Color(0xFF007A55).withValues(alpha: 0.2)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.cloud_done_rounded, color: Color(0xFF007A55), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bulutli xotira + Avtomatik zaxira + Barcha qurilmalarda sinxronizatsiya kiritilgan',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF007A55)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Payment Methods Selection (Uzbekistan providers)
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'To\'lov usulini tanlang:',
+                'O\'zbekiston to\'lov usulini tanlang:',
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
@@ -200,31 +250,41 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
             ),
             const SizedBox(height: 8),
 
-            _paymentMethodTile(
-              id: 'manual',
-              title: 'Tezkor faollashtirish (Demo / Admin)',
-              subtitle: 'To\'lovsiz bir zumda Pro sinovini faollashtirish',
+            _paymentProviderTile(
+              provider: PaymentProviderType.click,
+              title: 'Click Up',
+              subtitle: 'Click ilovasi yoki USSD orqali to\'lov',
+              icon: Icons.touch_app_rounded,
+              iconColor: const Color(0xFF0073FF),
+              colors: colors,
+            ),
+            const SizedBox(height: 8),
+
+            _paymentProviderTile(
+              provider: PaymentProviderType.payme,
+              title: 'Payme',
+              subtitle: 'Payme orqali xavfsiz to\'lov',
+              icon: Icons.payment_rounded,
+              iconColor: const Color(0xFF00CCCC),
+              colors: colors,
+            ),
+            const SizedBox(height: 8),
+
+            _paymentProviderTile(
+              provider: PaymentProviderType.uzum,
+              title: 'Uzum Bank',
+              subtitle: 'Uzum Bank yoki Uzum Nasiya orqali',
+              icon: Icons.account_balance_wallet_rounded,
+              iconColor: const Color(0xFF7000FF),
+              colors: colors,
+            ),
+            const SizedBox(height: 8),
+
+            _paymentProviderTile(
+              provider: PaymentProviderType.demo,
+              title: 'Tezkor Sinov (Sandbox / Demo)',
+              subtitle: 'Haqiqiy pul sarflamasdan Pro sinovini faollashtirish',
               icon: Icons.flash_on_rounded,
-              iconColor: const Color(0xFF007A55),
-              colors: colors,
-            ),
-            const SizedBox(height: 8),
-
-            _paymentMethodTile(
-              id: 'telegram',
-              title: 'Telegram bot orqali to\'lash',
-              subtitle: 'Telegram botda karta yoki hisobdan to\'lov qilish',
-              icon: Icons.send_rounded,
-              iconColor: const Color(0xFF229ED9),
-              colors: colors,
-            ),
-            const SizedBox(height: 8),
-
-            _paymentMethodTile(
-              id: 'local',
-              title: 'Mahalliy to\'lov (Click / Payme)',
-              subtitle: 'O\'zbekiston bank kartalari orqali to\'lov',
-              icon: Icons.account_balance_wallet_outlined,
               iconColor: const Color(0xFF10B981),
               colors: colors,
             ),
@@ -256,9 +316,7 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
                           const Icon(Icons.verified_rounded, size: 20),
                           const SizedBox(width: 8),
                           Text(
-                            _selectedMethod == 'telegram'
-                                ? 'Telegram botda to\'lash'
-                                : 'Pro obunani faollashtirish',
+                            '${_selectedProvider.displayName} orqali to\'lash',
                             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                           ),
                         ],
@@ -305,21 +363,21 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
     );
   }
 
-  Widget _paymentMethodTile({
-    required String id,
+  Widget _paymentProviderTile({
+    required PaymentProviderType provider,
     required String title,
     required String subtitle,
     required IconData icon,
     required Color iconColor,
     required dynamic colors,
   }) {
-    final isSelected = _selectedMethod == id;
+    final isSelected = _selectedProvider == provider;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
           HapticUtil.selection();
-          setState(() => _selectedMethod = id);
+          setState(() => _selectedProvider = provider);
         },
         borderRadius: BorderRadius.circular(AppDimensions.radiusMedium),
         child: Container(
@@ -378,60 +436,84 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
     HapticUtil.medium();
     setState(() => _isLoading = true);
 
+    final analytics = ref.read(monetizationAnalyticsProvider);
+    final paymentService = ref.read(paymentServiceProvider);
+    final cycle = _isAnnual ? 'annual' : 'monthly';
+    final price = _isAnnual ? _annualPrice : _monthlyPrice;
+
+    analytics.logCheckoutStarted(
+      planId: 'pro',
+      cycle: cycle,
+      provider: _selectedProvider.id,
+      amountUzs: price,
+    );
+
     try {
-      final cycle = _isAnnual ? 'annual' : 'monthly';
-
-      // 1. Create Payment Order on Backend
-      final order = await ref.read(subscriptionProvider.notifier).createOrder(
-        planId: 'pro',
-        billingCycle: cycle,
-        paymentMethod: _selectedMethod,
+      // 1. Process via provider-agnostic PaymentService
+      final result = await paymentService.processPayment(
+        request: PaymentOrderRequest(
+          planId: 'pro',
+          billingCycle: cycle,
+          amountUzs: price,
+          providerType: _selectedProvider,
+        ),
       );
-      if (_selectedMethod == 'telegram') {
-        if (order.botDeepLink != null) {
-          Clipboard.setData(ClipboardData(text: order.botDeepLink!));
-        }
-        // Confirm order on backend
-        await ref.read(subscriptionProvider.notifier).confirmOrder(
-          order.id,
-          externalTransactionId: 'tg_bot_${order.id.substring(0, 8)}',
-          paymentMethod: 'telegram',
-          notes: 'Telegram to\'lovi tasdiqlandi',
-        );
-      } else {
-        // Instant / manual confirmation flow on backend
-        await ref.read(subscriptionProvider.notifier).confirmOrder(
-          order.id,
-          externalTransactionId: 'manual_${order.id.substring(0, 8)}',
-          paymentMethod: _selectedMethod,
-          notes: 'To\'lov tasdiqlandi',
-        );
-      }
 
-      if (mounted) {
+      if (!mounted) return;
+
+      if (result.status == PaymentStatus.paid) {
+        analytics.logPaymentSuccess(
+          orderId: result.orderId,
+          planId: 'pro',
+          provider: _selectedProvider.id,
+          amountUzs: price,
+        );
         setState(() => _isLoading = false);
         HapticUtil.success();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: Color(0xFF007A55),
-            content: Text('Pro obuna muvaffaqiyatli faollashtirildi! Barcha imkoniyatlar ochildi 🎉'),
+            content: Text('Pro obuna muvaffaqiyatli faollashtirildi! Barcha bulutli va tahliliy imkoniyatlar ochildi 🎉'),
             duration: Duration(seconds: 3),
           ),
         );
         Navigator.pop(context, true);
+      } else if (result.status == PaymentStatus.pending) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.blueGrey,
+            content: Text(result.message),
+          ),
+        );
+      } else {
+        analytics.logPaymentFailure(
+          orderId: result.orderId,
+          reason: result.message,
+        );
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.redAccent,
+            content: Text(result.message),
+          ),
+        );
       }
     } catch (e) {
+      analytics.logPaymentFailure(reason: e.toString());
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.redAccent,
-            content: Text('Xatolik: $e'),
+            content: Text('Xatolik yuz berdi: $e'),
           ),
         );
       }
     }
   }
+
+
 
   String _getDefaultFeatureTitle(String featureKey) {
     switch (featureKey) {

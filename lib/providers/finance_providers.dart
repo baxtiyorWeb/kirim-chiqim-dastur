@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/monetization/app_features.dart';
+import '../core/payment/payment_service.dart';
+import '../core/sync/sync_service.dart';
+import '../core/sync/sync_types.dart';
 import '../data/models/transaction_item.dart';
 import '../data/models/debt_item.dart';
 import '../data/models/budget_model.dart';
@@ -793,5 +797,57 @@ class ProMemberNotifier extends Notifier<bool> {
 final proMemberProvider = NotifierProvider<ProMemberNotifier, bool>(() {
   return ProMemberNotifier();
 });
+
+/// Central Uzbekistan Payment Orchestrator Provider
+final paymentServiceProvider = Provider<PaymentService>((ref) {
+  final repo = ref.watch(financeRepositoryProvider);
+  return PaymentService(repo);
+});
+
+/// Central Offline + Cloud Sync Service Provider
+final syncServiceProvider = Provider<SyncService>((ref) {
+  final repo = ref.watch(financeRepositoryProvider);
+  final storage = ref.watch(localStorageProvider);
+  return SyncService(repo, storage);
+});
+
+/// Real-time sync status notifier provider
+class SyncStatusNotifier extends Notifier<SyncStatus> {
+  @override
+  SyncStatus build() {
+    final syncService = ref.watch(syncServiceProvider);
+    return syncService.currentStatus;
+  }
+
+  Future<SyncResult> triggerSync() async {
+    final syncService = ref.read(syncServiceProvider);
+    final sub = ref.read(subscriptionProvider);
+    state = SyncStatus.syncing;
+    final res = await syncService.sync(subscription: sub);
+    state = syncService.currentStatus;
+    if (res.isSuccess) {
+      ref.read(dashboardSummaryProvider.notifier).refresh();
+      ref.read(transactionsProvider.notifier).refresh();
+    }
+    return res;
+  }
+}
+
+final syncStatusProvider = NotifierProvider<SyncStatusNotifier, SyncStatus>(() {
+  return SyncStatusNotifier();
+});
+
+/// Strongly-typed feature access entitlement check provider
+/// Usage: ref.watch(hasFeatureAccessProvider(AppFeature.cloudSync))
+final hasFeatureAccessProvider = Provider.family<bool, AppFeature>((ref, feature) {
+  final sub = ref.watch(subscriptionProvider);
+  return sub.hasAccess(feature);
+});
+
+final typedFeatureEntitlementProvider = Provider.family<EntitlementModel?, AppFeature>((ref, feature) {
+  final sub = ref.watch(subscriptionProvider);
+  return sub.getFeatureEntitlement(feature);
+});
+
 
 

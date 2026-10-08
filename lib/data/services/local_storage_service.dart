@@ -1,10 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Secure Storage Service exclusively for Session Credentials, Auth Tokens, and UI Preferences.
-/// In strict accordance with the Production Fintech Architecture:
-/// NO BUSINESS OR FINANCIAL DATA (transactions, debts, budgets, goals, balances)
-/// IS PERSISTED LOCALLY ON THE DEVICE. The PostgreSQL database is the single source of truth.
+/// Offline-First Secure Storage Service for Session Credentials, UI Preferences,
+/// and Local Offline Persistence (Free tier offline & Pro tier local-first cache).
 class LocalStorageService {
   // Session & Authentication Keys ONLY
   static const String _authTokenKey = 'auth_token';
@@ -15,34 +14,13 @@ class LocalStorageService {
   static const String _hasSeenOnboardingKey = 'has_seen_onboarding';
   static const String _themeModeKey = 'app_theme_mode';
 
-  // Legacy keys to purge immediately to ensure zero local business data persistence
-  static const List<String> _legacyBusinessKeys = [
-    'app_transactions',
-    'app_debts',
-    'app_budget',
-    'app_goals',
-    'app_initial_balance',
-    'initial_balance',
-  ];
-
   final SharedPreferences _prefs;
 
   LocalStorageService(this._prefs);
 
   static Future<LocalStorageService> init() async {
     final prefs = await SharedPreferences.getInstance();
-    final service = LocalStorageService(prefs);
-    await service._purgeLegacyBusinessData();
-    return service;
-  }
-
-  /// Purges any legacy cached financial data from device storage
-  Future<void> _purgeLegacyBusinessData() async {
-    for (final key in _legacyBusinessKeys) {
-      if (_prefs.containsKey(key)) {
-        await _prefs.remove(key);
-      }
-    }
+    return LocalStorageService(prefs);
   }
 
   // -------------------------------------------------------------
@@ -195,6 +173,108 @@ class LocalStorageService {
     await _prefs.setInt(_evaluatedDecisionsKey, current + 1);
   }
 
+  // -------------------------------------------------------------
+  // OFFLINE BUSINESS DATA PERSISTENCE (FREE & PRO LOCAL-FIRST)
+  // -------------------------------------------------------------
+  static const String _offlineTransactionsKey = 'offline_transactions';
+  static const String _offlineDebtsKey = 'offline_debts';
+  static const String _offlineBudgetKey = 'offline_budget';
+  static const String _offlineGoalsKey = 'offline_goals';
+  static const String _offlineInitialBalanceKey = 'offline_initial_balance';
+  static const String _offlineLastSyncTimeKey = 'offline_last_sync_time';
+  static const String _offlinePendingChangesKey = 'offline_pending_changes';
+
+  List<Map<String, dynamic>> getOfflineTransactions() {
+    final raw = _prefs.getString(_offlineTransactionsKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> saveOfflineTransactions(List<Map<String, dynamic>> list) async {
+    await _prefs.setString(_offlineTransactionsKey, jsonEncode(list));
+  }
+
+  List<Map<String, dynamic>> getOfflineDebts() {
+    final raw = _prefs.getString(_offlineDebtsKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> saveOfflineDebts(List<Map<String, dynamic>> list) async {
+    await _prefs.setString(_offlineDebtsKey, jsonEncode(list));
+  }
+
+  Map<String, dynamic>? getOfflineBudget() {
+    final raw = _prefs.getString(_offlineBudgetKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> saveOfflineBudget(Map<String, dynamic> budgetMap) async {
+    await _prefs.setString(_offlineBudgetKey, jsonEncode(budgetMap));
+  }
+
+  List<Map<String, dynamic>> getOfflineGoals() {
+    final raw = _prefs.getString(_offlineGoalsKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> saveOfflineGoals(List<Map<String, dynamic>> list) async {
+    await _prefs.setString(_offlineGoalsKey, jsonEncode(list));
+  }
+
+  int getOfflineInitialBalance() {
+    return _prefs.getInt(_offlineInitialBalanceKey) ?? _sessionInitialBalance;
+  }
+
+  Future<void> saveOfflineInitialBalance(int amount) async {
+    _sessionInitialBalance = amount;
+    await _prefs.setInt(_offlineInitialBalanceKey, amount);
+  }
+
+  DateTime? getLastSyncTime() {
+    final raw = _prefs.getString(_offlineLastSyncTimeKey);
+    if (raw == null) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  Future<void> setLastSyncTime(DateTime time) async {
+    await _prefs.setString(_offlineLastSyncTimeKey, time.toIso8601String());
+  }
+
+  int getPendingChangesCount() {
+    return _prefs.getInt(_offlinePendingChangesKey) ?? 0;
+  }
+
+  Future<void> setPendingChangesCount(int count) async {
+    await _prefs.setInt(_offlinePendingChangesKey, count);
+  }
+
   /// Secure session clear on logout
   Future<void> clearAllData() async {
     await _prefs.remove(_authTokenKey);
@@ -204,7 +284,6 @@ class LocalStorageService {
     await _prefs.remove(_userPhoneKey);
     await _prefs.remove(_initialBalanceKey);
     _sessionInitialBalance = 0;
-    await _purgeLegacyBusinessData();
   }
 
   Future<void> clearAll() => clearAllData();

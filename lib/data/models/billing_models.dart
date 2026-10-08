@@ -1,3 +1,5 @@
+import '../../core/monetization/app_features.dart';
+
 class PlanModel {
   final String id;
   final String name;
@@ -191,7 +193,15 @@ class SubscriptionDetailsModel {
     return ent.isEntitled && (ent.isUnlimited || ent.remaining > 0);
   }
 
+  bool hasAccess(AppFeature feature) {
+    if (isPro) return true;
+    if (feature == AppFeature.offlineStorage) return true;
+    return canUse(feature.key);
+  }
+
   EntitlementModel? getEntitlement(String featureKey) => entitlements[featureKey];
+
+  EntitlementModel? getFeatureEntitlement(AppFeature feature) => entitlements[feature.key];
 
   factory SubscriptionDetailsModel.fromJson(Map<String, dynamic> json) {
     final planJson = json['plan'] as Map<String, dynamic>? ?? {};
@@ -231,36 +241,84 @@ class SubscriptionDetailsModel {
       ),
       isPro: isPro,
       entitlements: {
-        'what_if_simulator': EntitlementModel(
-          featureKey: 'what_if_simulator',
-          isEntitled: true,
-          limit: isPro ? -1 : 3,
-          currentUsage: 0,
-          remaining: isPro ? -1 : 3,
-          period: periodKey,
-        ),
-        'intelligence_daily_budget': EntitlementModel(
-          featureKey: 'intelligence_daily_budget',
+        AppFeature.offlineStorage.key: EntitlementModel(
+          featureKey: AppFeature.offlineStorage.key,
           isEntitled: true,
           limit: -1,
           currentUsage: 0,
           remaining: -1,
           period: periodKey,
         ),
-        'runway_forecast': EntitlementModel(
-          featureKey: 'runway_forecast',
+        AppFeature.cloudSync.key: EntitlementModel(
+          featureKey: AppFeature.cloudSync.key,
           isEntitled: isPro,
           limit: isPro ? -1 : 0,
           currentUsage: 0,
           remaining: isPro ? -1 : 0,
           period: periodKey,
         ),
-        'export_reports': EntitlementModel(
-          featureKey: 'export_reports',
+        AppFeature.cloudBackup.key: EntitlementModel(
+          featureKey: AppFeature.cloudBackup.key,
+          isEntitled: isPro,
+          limit: isPro ? -1 : 0,
+          currentUsage: 0,
+          remaining: isPro ? -1 : 0,
+          period: periodKey,
+        ),
+        AppFeature.multiDeviceSync.key: EntitlementModel(
+          featureKey: AppFeature.multiDeviceSync.key,
+          isEntitled: isPro,
+          limit: isPro ? -1 : 0,
+          currentUsage: 0,
+          remaining: isPro ? -1 : 0,
+          period: periodKey,
+        ),
+        AppFeature.whatIfSimulator.key: EntitlementModel(
+          featureKey: AppFeature.whatIfSimulator.key,
+          isEntitled: true,
+          limit: isPro ? -1 : 3,
+          currentUsage: 0,
+          remaining: isPro ? -1 : 3,
+          period: periodKey,
+        ),
+        AppFeature.dynamicDailyBudget.key: EntitlementModel(
+          featureKey: AppFeature.dynamicDailyBudget.key,
+          isEntitled: true,
+          limit: -1,
+          currentUsage: 0,
+          remaining: -1,
+          period: periodKey,
+        ),
+        AppFeature.runwayForecast.key: EntitlementModel(
+          featureKey: AppFeature.runwayForecast.key,
+          isEntitled: isPro,
+          limit: isPro ? -1 : 0,
+          currentUsage: 0,
+          remaining: isPro ? -1 : 0,
+          period: periodKey,
+        ),
+        AppFeature.exportReports.key: EntitlementModel(
+          featureKey: AppFeature.exportReports.key,
           isEntitled: true,
           limit: isPro ? -1 : 2,
           currentUsage: 0,
           remaining: isPro ? -1 : 2,
+          period: periodKey,
+        ),
+        AppFeature.advancedAnalytics.key: EntitlementModel(
+          featureKey: AppFeature.advancedAnalytics.key,
+          isEntitled: isPro,
+          limit: isPro ? -1 : 0,
+          currentUsage: 0,
+          remaining: isPro ? -1 : 0,
+          period: periodKey,
+        ),
+        AppFeature.smartDebtsAdvisor.key: EntitlementModel(
+          featureKey: AppFeature.smartDebtsAdvisor.key,
+          isEntitled: true,
+          limit: isPro ? -1 : 5,
+          currentUsage: 0,
+          remaining: isPro ? -1 : 5,
           period: periodKey,
         ),
       },

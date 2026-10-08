@@ -397,19 +397,63 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Shunchaki daromad va xarajatlarni yozib borish uchun asosiy vositalar.',
+                      'Faqat shu qurilmada mustaqil ishlaydigan oflayn moliyaviy hisob-kitob daftari.',
                       style: TextStyle(
                         fontSize: 13,
                         color: colors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 16),
+                    _buildSimpleFeature('To\'liq oflayn ishlash (internetsiz)', colors, true),
                     _buildSimpleFeature('Cheksiz daromad va xarajat kiritish', colors, true),
-                    _buildSimpleFeature('Oddiy qarzlar ro\'yxati', colors, true),
-                    _buildSimpleFeature('Oylik xarajatlar diagrammasi', colors, true),
-                    _buildSimpleFeature('Xaridni oldindan hisoblash', colors, false),
-                    _buildSimpleFeature('Dinamik kunlik xarajat chegarasi', colors, false),
-                    _buildSimpleFeature('Mablag\' yetish muddati ogohlantirishlari', colors, false),
+                    _buildSimpleFeature('Mahalliy xotira (faqat shu telefonda)', colors, true),
+                    _buildSimpleFeature('Oddiy qarzlar ro\'yxati va toifalar', colors, true),
+                    _buildSimpleFeature('Bulutli zaxira va sinxronizatsiya', colors, false),
+                    _buildSimpleFeature('Boshqa qurilmalarda bir xil hisob', colors, false),
+                    _buildSimpleFeature('Xaridni oldindan AI simulyatsiya qilish', colors, false),
+                    _buildSimpleFeature('Mablag\' yetish muddati (Runway) prognozi', colors, false),
+                    _buildSimpleFeature('Cheksiz PDF va Excel hisobot eksporti', colors, false),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppDimensions.space24),
+
+              // 5-SECOND COMPARISON MATRIX TABLE
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppDimensions.space20),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF16191F) : Colors.white,
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusExtraLarge),
+                  border: Border.all(color: colors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tezkor taqqoslash (5 soniyada)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Siz uchun eng qulay tarifni tanlang:',
+                      style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildComparisonRow('Imkoniyat', 'Oddiy', 'Pro ✨', isHeader: true, colors: colors),
+                    const Divider(height: 16),
+                    _buildComparisonRow('Oflayn xotira (internetsiz)', 'Mavjud', 'Mavjud', colors: colors),
+                    _buildComparisonRow('Bulutli zaxira va tiklash', 'Yo\'q', 'Avtomatik', colors: colors),
+                    _buildComparisonRow('Ko\'p qurilmada sinxronizatsiya', 'Yo\'q', 'Ha', colors: colors),
+                    _buildComparisonRow('Telefon yo\'qolganda ma\'lumot', 'Yo\'qoladi', 'Saqlanadi', colors: colors),
+                    _buildComparisonRow('Xaridni simulyatsiya qilish', '3 ta/oy', 'Cheksiz', colors: colors),
+                    _buildComparisonRow('Mablag\' yetish prognozi', 'Yo\'q', 'To\'liq', colors: colors),
+                    _buildComparisonRow('PDF / Excel eksport', 'Yo\'q', 'Cheksiz', colors: colors),
                   ],
                 ),
               ),
@@ -576,6 +620,59 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 fontWeight: included ? FontWeight.w500 : FontWeight.w400,
                 color: included ? colors.textPrimary : colors.textSecondary.withValues(alpha: 0.6),
                 decoration: included ? null : TextDecoration.lineThrough,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComparisonRow(
+    String feature,
+    String freeValue,
+    String proValue, {
+    bool isHeader = false,
+    required AppThemeTokens colors,
+  }) {
+    final style = TextStyle(
+      fontSize: isHeader ? 12.5 : 12,
+      fontWeight: isHeader ? FontWeight.w700 : FontWeight.w500,
+      color: isHeader ? colors.textPrimary : colors.textSecondary,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: Text(
+              feature,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isHeader ? FontWeight.w700 : FontWeight.w600,
+                color: colors.textPrimary,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              freeValue,
+              textAlign: TextAlign.center,
+              style: style,
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              proValue,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: isHeader ? 12.5 : 12,
+                fontWeight: FontWeight.w700,
+                color: isHeader ? const Color(0xFF007A55) : const Color(0xFF10B981),
               ),
             ),
           ),

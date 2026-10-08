@@ -37,6 +37,7 @@ class FinanceRepository {
 
   FinanceRepository(this._storage, [ApiClient? api])
       : _api = api ?? ApiClient(_storage) {
+    hydrateFromLocalStorage();
     _api.onUnauthorized = () async {
       if (_isHandlingUnauthorized) return;
       _isHandlingUnauthorized = true;
@@ -47,6 +48,66 @@ class FinanceRepository {
         _isHandlingUnauthorized = false;
       }
     };
+  }
+
+  /// Hydrates in-memory lists from device local storage (guarantees offline availability for Free & Paid)
+  void hydrateFromLocalStorage() {
+    try {
+      final cachedTxs = _storage.getOfflineTransactions();
+      if (cachedTxs.isNotEmpty) {
+        _transactions = cachedTxs.map((m) => TransactionItem.fromJson(m)).toList();
+      }
+      final cachedDebts = _storage.getOfflineDebts();
+      if (cachedDebts.isNotEmpty) {
+        _debts = cachedDebts.map((m) => DebtItem.fromJson(m)).toList();
+      }
+      final cachedBudget = _storage.getOfflineBudget();
+      if (cachedBudget != null) {
+        _budget = BudgetModel.fromJson(cachedBudget);
+      }
+      final cachedGoals = _storage.getOfflineGoals();
+      if (cachedGoals.isNotEmpty) {
+        _goals = cachedGoals.map((m) => SavingsGoal.fromJson(m)).toList();
+      }
+      final cachedInitial = _storage.getOfflineInitialBalance();
+      if (cachedInitial > 0) {
+        _userProfile = _userProfile.copyWith(initialBalance: cachedInitial);
+      }
+      _isInitialized = true;
+    } catch (e) {
+      debugPrint('[FinanceRepository] hydrateFromLocalStorage notice: $e');
+    }
+  }
+
+  void persistAllOffline() {
+    _persistTransactionsOffline();
+    _persistDebtsOffline();
+    _persistBudgetOffline();
+    _persistGoalsOffline();
+  }
+
+  void _persistTransactionsOffline() {
+    try {
+      _storage.saveOfflineTransactions(_transactions.map((t) => t.toJson()).toList());
+    } catch (_) {}
+  }
+
+  void _persistDebtsOffline() {
+    try {
+      _storage.saveOfflineDebts(_debts.map((d) => d.toJson()).toList());
+    } catch (_) {}
+  }
+
+  void _persistBudgetOffline() {
+    try {
+      _storage.saveOfflineBudget(_budget.toJson());
+    } catch (_) {}
+  }
+
+  void _persistGoalsOffline() {
+    try {
+      _storage.saveOfflineGoals(_goals.map((g) => g.toJson()).toList());
+    } catch (_) {}
   }
 
   ApiClient get api => _api;
@@ -462,12 +523,14 @@ class FinanceRepository {
       if (res is Map<String, dynamic>) {
         final serverItem = TransactionItem.fromJson(res);
         _transactions.insert(0, serverItem);
+        _persistTransactionsOffline();
         // Silently update dashboard in background
         fetchDashboard();
         return serverItem;
       }
     }
     _transactions.insert(0, item);
+    _persistTransactionsOffline();
     return item;
   }
 
@@ -479,6 +542,7 @@ class FinanceRepository {
     if (index != -1) {
       _transactions[index] = updatedItem.copyWith(updatedAt: DateTime.now());
     }
+    _persistTransactionsOffline();
     fetchDashboard();
   }
 
@@ -487,6 +551,7 @@ class FinanceRepository {
       await _api.delete('${ApiConstants.transactions}/$id');
     }
     _transactions.removeWhere((e) => e.id == id);
+    _persistTransactionsOffline();
     fetchDashboard();
   }
 
@@ -515,10 +580,12 @@ class FinanceRepository {
       if (res is Map<String, dynamic>) {
         final serverDebt = DebtItem.fromJson(res);
         _debts.insert(0, serverDebt);
+        _persistDebtsOffline();
         return serverDebt;
       }
     }
     _debts.insert(0, debt);
+    _persistDebtsOffline();
     return debt;
   }
 
@@ -530,6 +597,7 @@ class FinanceRepository {
     if (index != -1) {
       _debts[index] = updatedDebt.copyWith(updatedAt: DateTime.now());
     }
+    _persistDebtsOffline();
   }
 
   Future<void> recordDebtPayment({
@@ -566,6 +634,7 @@ class FinanceRepository {
         );
       }
     }
+    _persistDebtsOffline();
 
     if (linkTransaction) {
       final debtItem = _debts.firstWhere((d) => d.id == debtId);
@@ -597,6 +666,7 @@ class FinanceRepository {
         note: 'To\'liq qaytarildi',
       );
     }
+    _persistDebtsOffline();
   }
 
   Future<void> deleteDebt(String id) async {
@@ -604,6 +674,7 @@ class FinanceRepository {
       await _api.delete('${ApiConstants.debts}/$id');
     }
     _debts.removeWhere((d) => d.id == id);
+    _persistDebtsOffline();
   }
 
   // -------------------------------------------------------------
@@ -628,6 +699,7 @@ class FinanceRepository {
 
   Future<void> saveBudget(BudgetModel budget) async {
     _budget = budget;
+    _persistBudgetOffline();
     if (isAuthenticated) {
       await _api.put(ApiConstants.budget, body: {
         'totalMonthlyLimit': budget.totalMonthlyBudget,
@@ -639,6 +711,7 @@ class FinanceRepository {
     final updatedLimits = Map<String, int>.from(_budget.categoryLimits);
     updatedLimits[categoryId] = limitAmount;
     _budget = _budget.copyWith(categoryLimits: updatedLimits);
+    _persistBudgetOffline();
 
     if (isAuthenticated) {
       await _api.put('${ApiConstants.budgetCategoryLimit}/$categoryId', body: {
@@ -660,6 +733,7 @@ class FinanceRepository {
       final res = await _api.get(ApiConstants.goals);
       if (res is List) {
         _goals = res.map((e) => SavingsGoal.fromJson(e as Map<String, dynamic>)).toList();
+        _persistGoalsOffline();
       }
     } catch (e) {
       debugPrint('[FinanceRepository] fetchGoals error: $e');
@@ -673,10 +747,12 @@ class FinanceRepository {
       if (res is Map<String, dynamic>) {
         final serverGoal = SavingsGoal.fromJson(res);
         _goals.add(serverGoal);
+        _persistGoalsOffline();
         return serverGoal;
       }
     }
     _goals.add(goal);
+    _persistGoalsOffline();
     return goal;
   }
 
@@ -691,6 +767,7 @@ class FinanceRepository {
         _goals[index] = goal.copyWith(currentAmount: goal.currentAmount + amount);
       }
     }
+    _persistGoalsOffline();
   }
 
   Future<void> deleteGoal(String id) async {
@@ -698,6 +775,7 @@ class FinanceRepository {
       await _api.delete('${ApiConstants.goals}/$id');
     }
     _goals.removeWhere((g) => g.id == id);
+    _persistGoalsOffline();
   }
 
   // -------------------------------------------------------------
