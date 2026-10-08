@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/api_constants.dart';
 import '../api/api_client.dart';
@@ -920,12 +921,12 @@ class FinanceRepository {
       'title': title ?? '',
     });
     // Refresh subscription to reflect updated usage
-    fetchSubscription().ignore();
+    unawaited(fetchSubscription());
     return res as Map<String, dynamic>;
   }
 
   Future<void> authorizeExport() async {
     await _api.post(ApiConstants.reportsExport);
-    fetchSubscription().ignore();
+    unawaited(fetchSubscription());
   }
 }

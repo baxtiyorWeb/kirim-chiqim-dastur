@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/transaction_item.dart';
@@ -662,7 +663,7 @@ void syncAllFinanceProviders(dynamic ref) {
   ref.read(initialBalanceProvider.notifier).reset(repo.getInitialBalance());
   ref.read(statisticsProvider.notifier).reset();
   ref.read(selectedDateFilterProvider.notifier).reset();
-  ref.read(subscriptionProvider.notifier).refresh().ignore();
+  unawaited((ref.read(subscriptionProvider.notifier) as SubscriptionNotifier).refresh());
 }
 
 /// Full logout flow: clears storage, cancels in-flight requests, clears repository cache, and wipes all Riverpod notifiers.
