@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../../data/models/billing_models.dart';
+import '../../data/models/debt_item.dart';
 import '../../data/repositories/finance_repository.dart';
 import '../../data/services/local_storage_service.dart';
+import '../constants/api_constants.dart';
 import '../monetization/app_features.dart';
 import 'sync_types.dart';
 
@@ -52,10 +54,13 @@ class SyncService {
     statusNotifier.value = SyncStatus.syncing;
 
     try {
-      // Pull and synchronize authoritative PostgreSQL state
+      // 1. Attempt delta push of any local changes to server
+      await _pushDeltaChanges();
+
+      // 2. Synchronize latest PostgreSQL cloud state
       await _repository.syncAllWithBackend();
 
-      // Persist newly fetched state into local storage for offline resiliency
+      // 3. Persist newly fetched state into local encrypted storage for offline resiliency
       await _persistCurrentStateLocally();
 
       final now = DateTime.now();
@@ -65,9 +70,52 @@ class SyncService {
       statusNotifier.value = SyncStatus.synced;
       return SyncResult.success(itemsSynced: _repository.getTransactions().length);
     } catch (e) {
-      debugPrint('[SyncService] Cloud sync failed (offline fallback active): $e');
+      debugPrint('[SyncService] Cloud sync notice (offline fallback active): $e');
       statusNotifier.value = SyncStatus.offline;
       return SyncResult.offline();
+    }
+  }
+
+  /// Pushes delta changes to PostgreSQL /api/v1/sync/push
+  Future<void> _pushDeltaChanges() async {
+    try {
+      final txs = _repository.getTransactions();
+      final debts = _repository.getDebts();
+
+      final payload = {
+        'clientTime': DateTime.now().toIso8601String(),
+        'transactions': txs.map((t) => {
+          'id': t.id,
+          'categoryId': t.categoryId,
+          'title': t.title,
+          'amount': t.amount,
+          'transactionType': t.isIncome ? 'income' : 'expense',
+          'transactionDate': t.dateTime.toIso8601String(),
+          'note': t.note,
+          'paymentMethod': t.paymentMethod,
+          'personName': t.personName,
+          'updatedAt': t.updatedAt.toIso8601String(),
+          'version': 1,
+        }).toList(),
+        'debts': debts.map((d) => {
+          'id': d.id,
+          'personName': d.personName,
+          'phoneNumber': d.phoneNumber,
+          'amount': d.amount,
+          'paidAmount': d.paidAmount,
+          'debtType': d.type == DebtType.borrowed ? 'borrowed' : 'lent',
+          'status': d.status.name,
+          'dueDate': d.dueDate?.toIso8601String(),
+          'note': d.note,
+          'updatedAt': DateTime.now().toIso8601String(),
+          'version': 1,
+        }).toList(),
+      };
+
+      await _repository.api.post(ApiConstants.syncPush, body: payload);
+    } catch (e) {
+      // Non-fatal: if push fails, full sync continues
+      debugPrint('[SyncService] Delta push notice: $e');
     }
   }
 

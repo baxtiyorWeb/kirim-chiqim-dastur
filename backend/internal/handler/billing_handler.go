@@ -571,7 +571,7 @@ func getPlanFeatureLimit(planID, featureKey string, isPro bool) int {
 	case models.FeatureDailyBudgetBreakdown:
 		return 5 // 5 daily breakdowns per month
 	case models.FeatureCloudSync:
-		return -1 // Basic cloud sync enabled
+		return 0 // Locked on free plan: Free is strictly offline-only, Cloud Sync is Pro-exclusive
 	default:
 		return -1
 	}

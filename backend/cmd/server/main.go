@@ -35,6 +35,8 @@ func main() {
 	goalH := handler.NewGoalHandler(repo)
 	dashH := handler.NewDashboardHandler(repo)
 	billingH := handler.NewBillingHandler(repo)
+	webhookH := handler.NewWebhookHandler(repo, cfg)
+	syncH := handler.NewSyncHandler(repo)
 	healthH := handler.NewHealthHandler()
 
 	mux := http.NewServeMux()
@@ -51,8 +53,16 @@ func main() {
 	// Order confirmation can be called directly by external webhook / Telegram bot / admin
 	mux.HandleFunc("POST /api/v1/billing/orders/{id}/confirm", billingH.ConfirmOrder)
 
+	// Payment Webhooks (Click & Payme)
+	mux.HandleFunc("POST /api/v1/billing/webhooks/click", webhookH.ClickWebhook)
+	mux.HandleFunc("POST /api/v1/billing/webhooks/payme", webhookH.PaymeWebhook)
+
 	// Protected routes helper
 	protect := middleware.Auth(cfg.JWTSecret, repo)
+
+	// Delta Cloud Sync (Enforces Pro Entitlement)
+	mux.Handle("POST /api/v1/sync/push", protect(http.HandlerFunc(syncH.Push)))
+	mux.Handle("GET /api/v1/sync/pull", protect(http.HandlerFunc(syncH.Pull)))
 
 	// Auth & User Profile
 	mux.Handle("GET /api/v1/auth/me", protect(http.HandlerFunc(authH.Me)))

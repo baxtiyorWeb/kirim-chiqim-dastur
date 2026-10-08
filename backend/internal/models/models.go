@@ -269,3 +269,60 @@ type AdminSubscriptionRequest struct {
 	DurationDays int       `json:"durationDays"`
 }
 
+// ============================================================
+// DELTA SYNC & CONFLICT RESOLUTION MODELS
+// ============================================================
+
+type SyncPushRequest struct {
+	Transactions []SyncTransactionItem `json:"transactions,omitempty"`
+	Debts        []SyncDebtItem        `json:"debts,omitempty"`
+	DeviceID     string                `json:"deviceId,omitempty"`
+	ClientTime   time.Time             `json:"clientTime"`
+}
+
+type SyncTransactionItem struct {
+	ID              uuid.UUID  `json:"id"`
+	CategoryID      string     `json:"categoryId"`
+	Title           string     `json:"title"`
+	Amount          int64      `json:"amount"`
+	TransactionType string     `json:"transactionType"`
+	TransactionDate time.Time  `json:"transactionDate"`
+	Note            string     `json:"note,omitempty"`
+	PaymentMethod   string     `json:"paymentMethod"`
+	PersonName      string     `json:"personName,omitempty"`
+	Version         int64      `json:"version"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+	DeletedAt       *time.Time `json:"deletedAt,omitempty"`
+}
+
+type SyncDebtItem struct {
+	ID          uuid.UUID  `json:"id"`
+	PersonName  string     `json:"personName"`
+	PhoneNumber string     `json:"phoneNumber,omitempty"`
+	Amount      int64      `json:"amount"`
+	PaidAmount  int64      `json:"paidAmount"`
+	DebtType    string     `json:"debtType"`
+	Status      string     `json:"status"`
+	DueDate     *time.Time `json:"dueDate,omitempty"`
+	Note        string     `json:"note,omitempty"`
+	Version     int64      `json:"version"`
+	UpdatedAt   time.Time  `json:"updatedAt"`
+	DeletedAt   *time.Time `json:"deletedAt,omitempty"`
+}
+
+type SyncPushResponse struct {
+	Success          bool      `json:"success"`
+	ProcessedCount   int       `json:"processedCount"`
+	ServerTime       time.Time `json:"serverTime"`
+	ConflictsIgnored int       `json:"conflictsIgnored,omitempty"`
+}
+
+type SyncPullResponse struct {
+	Transactions []Transaction `json:"transactions"`
+	Debts        []Debt        `json:"debts"`
+	ServerTime   time.Time     `json:"serverTime"`
+	Cursor       string        `json:"cursor"`
+	HasMore      bool          `json:"hasMore"`
+}
+
+

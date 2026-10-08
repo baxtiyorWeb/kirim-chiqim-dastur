@@ -6,11 +6,14 @@ import (
 )
 
 type Config struct {
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
-	AppEnv      string
-	CorsOrigins []string
+	Port           string
+	DatabaseURL    string
+	JWTSecret      string
+	AppEnv         string
+	CorsOrigins    []string
+	ClickSecretKey string
+	ClickServiceID string
+	PaymeSecretKey string
 }
 
 func Load() *Config {
@@ -33,6 +36,10 @@ func Load() *Config {
 		appEnv = "development"
 	}
 
+	clickSecretKey := os.Getenv("CLICK_SECRET_KEY")
+	clickServiceID := os.Getenv("CLICK_SERVICE_ID")
+	paymeSecretKey := os.Getenv("PAYME_SECRET_KEY")
+
 	corsRaw := os.Getenv("CORS_ORIGINS")
 	var corsOrigins []string
 	if corsRaw == "" {
@@ -44,11 +51,14 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:        port,
-		DatabaseURL: dbURL,
-		JWTSecret:   jwtSecret,
-		AppEnv:      appEnv,
-		CorsOrigins: corsOrigins,
+		Port:           port,
+		DatabaseURL:    dbURL,
+		JWTSecret:      jwtSecret,
+		AppEnv:         appEnv,
+		CorsOrigins:    corsOrigins,
+		ClickSecretKey: clickSecretKey,
+		ClickServiceID: clickServiceID,
+		PaymeSecretKey: paymeSecretKey,
 	}
 }
 

@@ -41,5 +41,9 @@ class ApiConstants {
   static const String intelligenceWhatIf = '/api/v1/intelligence/what-if';
   static const String intelligenceRunway = '/api/v1/intelligence/runway';
   static const String reportsExport = '/api/v1/reports/export';
+
+  // Delta Cloud Synchronization (Pro-only)
+  static const String syncPush = '/api/v1/sync/push';
+  static const String syncPull = '/api/v1/sync/pull';
 }
 

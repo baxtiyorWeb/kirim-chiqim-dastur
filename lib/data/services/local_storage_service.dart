@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/security/encryption_service.dart';
 
 /// Offline-First Secure Storage Service for Session Credentials, UI Preferences,
 /// and Local Offline Persistence (Free tier offline & Pro tier local-first cache).
@@ -174,7 +175,7 @@ class LocalStorageService {
   }
 
   // -------------------------------------------------------------
-  // OFFLINE BUSINESS DATA PERSISTENCE (FREE & PRO LOCAL-FIRST)
+  // OFFLINE BUSINESS DATA PERSISTENCE (ENCRYPTED AT REST)
   // -------------------------------------------------------------
   static const String _offlineTransactionsKey = 'offline_transactions';
   static const String _offlineDebtsKey = 'offline_debts';
@@ -188,64 +189,93 @@ class LocalStorageService {
     final raw = _prefs.getString(_offlineTransactionsKey);
     if (raw == null || raw.isEmpty) return [];
     try {
-      final decoded = jsonDecode(raw);
+      final decrypted = EncryptionService.instance.decrypt(raw);
+      final decoded = jsonDecode(decrypted);
       if (decoded is List) {
-        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        final list = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        // Auto-migrate legacy plain text to encrypted format
+        if (!EncryptionService.instance.isEncrypted(raw)) {
+          saveOfflineTransactions(list);
+        }
+        return list;
       }
     } catch (_) {}
     return [];
   }
 
   Future<void> saveOfflineTransactions(List<Map<String, dynamic>> list) async {
-    await _prefs.setString(_offlineTransactionsKey, jsonEncode(list));
+    final plainJson = jsonEncode(list);
+    final encrypted = EncryptionService.instance.encrypt(plainJson);
+    await _prefs.setString(_offlineTransactionsKey, encrypted);
   }
 
   List<Map<String, dynamic>> getOfflineDebts() {
     final raw = _prefs.getString(_offlineDebtsKey);
     if (raw == null || raw.isEmpty) return [];
     try {
-      final decoded = jsonDecode(raw);
+      final decrypted = EncryptionService.instance.decrypt(raw);
+      final decoded = jsonDecode(decrypted);
       if (decoded is List) {
-        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        final list = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        if (!EncryptionService.instance.isEncrypted(raw)) {
+          saveOfflineDebts(list);
+        }
+        return list;
       }
     } catch (_) {}
     return [];
   }
 
   Future<void> saveOfflineDebts(List<Map<String, dynamic>> list) async {
-    await _prefs.setString(_offlineDebtsKey, jsonEncode(list));
+    final plainJson = jsonEncode(list);
+    final encrypted = EncryptionService.instance.encrypt(plainJson);
+    await _prefs.setString(_offlineDebtsKey, encrypted);
   }
 
   Map<String, dynamic>? getOfflineBudget() {
     final raw = _prefs.getString(_offlineBudgetKey);
     if (raw == null || raw.isEmpty) return null;
     try {
-      final decoded = jsonDecode(raw);
+      final decrypted = EncryptionService.instance.decrypt(raw);
+      final decoded = jsonDecode(decrypted);
       if (decoded is Map) {
-        return Map<String, dynamic>.from(decoded);
+        final map = Map<String, dynamic>.from(decoded);
+        if (!EncryptionService.instance.isEncrypted(raw)) {
+          saveOfflineBudget(map);
+        }
+        return map;
       }
     } catch (_) {}
     return null;
   }
 
   Future<void> saveOfflineBudget(Map<String, dynamic> budgetMap) async {
-    await _prefs.setString(_offlineBudgetKey, jsonEncode(budgetMap));
+    final plainJson = jsonEncode(budgetMap);
+    final encrypted = EncryptionService.instance.encrypt(plainJson);
+    await _prefs.setString(_offlineBudgetKey, encrypted);
   }
 
   List<Map<String, dynamic>> getOfflineGoals() {
     final raw = _prefs.getString(_offlineGoalsKey);
     if (raw == null || raw.isEmpty) return [];
     try {
-      final decoded = jsonDecode(raw);
+      final decrypted = EncryptionService.instance.decrypt(raw);
+      final decoded = jsonDecode(decrypted);
       if (decoded is List) {
-        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        final list = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        if (!EncryptionService.instance.isEncrypted(raw)) {
+          saveOfflineGoals(list);
+        }
+        return list;
       }
     } catch (_) {}
     return [];
   }
 
   Future<void> saveOfflineGoals(List<Map<String, dynamic>> list) async {
-    await _prefs.setString(_offlineGoalsKey, jsonEncode(list));
+    final plainJson = jsonEncode(list);
+    final encrypted = EncryptionService.instance.encrypt(plainJson);
+    await _prefs.setString(_offlineGoalsKey, encrypted);
   }
 
   int getOfflineInitialBalance() {
