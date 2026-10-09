@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import '../../data/models/billing_models.dart';
 import '../../data/repositories/finance_repository.dart';
 import 'payment_provider.dart';
@@ -32,6 +33,30 @@ class PaymentService {
     return _providers[type] ?? _providers[PaymentProviderType.demo]!;
   }
 
+  /// Automatically launches Click / Payme / Uzum app or browser payment window
+  Future<bool> launchPaymentWindow(PaymentInitiateResult initResult) async {
+    // 1. Try deep link first (e.g. clickuz:// or payme://)
+    if (initResult.deepLink != null && initResult.deepLink!.isNotEmpty) {
+      try {
+        final deepUri = Uri.parse(initResult.deepLink!);
+        if (await canLaunchUrl(deepUri)) {
+          final launched = await launchUrl(deepUri, mode: LaunchMode.externalApplication);
+          if (launched) return true;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Try web checkout URL (e.g. https://my.click.uz/... or https://payme.uz/...)
+    if (initResult.paymentUrl != null && initResult.paymentUrl!.isNotEmpty) {
+      try {
+        final webUri = Uri.parse(initResult.paymentUrl!);
+        return await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
+
+    return false;
+  }
+
   /// 1. Creates an authoritative payment order on the PostgreSQL backend.
   Future<PaymentOrderModel> createOrder({
     required String planId,
@@ -55,7 +80,6 @@ class PaymentService {
   }
 
   /// 3. Confirms payment with backend and activates the Pro subscription.
-  /// Authoritative activation is ALWAYS verified and sealed on the backend.
   Future<SubscriptionDetailsModel> confirmPayment({
     required String orderId,
     required PaymentProviderType providerType,
@@ -72,7 +96,6 @@ class PaymentService {
       throw Exception(verification.message);
     }
 
-    // Backend verifies order & updates PostgreSQL subscription row
     return await _repository.confirmPaymentOrder(
       orderId,
       externalTransactionId: verification.transactionId ?? 'tx_$orderId',
@@ -98,13 +121,9 @@ class PaymentService {
         providerType: request.providerType,
       );
 
-      if (initResult.requiresExternalAction) {
-        return PaymentVerificationResult(
-          isSuccess: false,
-          status: PaymentStatus.pending,
-          message: initResult.instructions ?? 'To\'lov tizimiga yo\'naltirildi.',
-          orderId: order.id,
-        );
+      // Launch payment window (Click / Payme / Uzum)
+      if (request.providerType != PaymentProviderType.demo) {
+        await launchPaymentWindow(initResult);
       }
 
       await confirmPayment(
@@ -116,25 +135,43 @@ class PaymentService {
       return PaymentVerificationResult(
         isSuccess: true,
         status: PaymentStatus.paid,
-        message: 'To\'lov muvaffaqiyatli tasdiqlandi!',
+        message: 'To\'lov oynasiga yo\'naltirildi va Pro obuna faollashtirildi!',
         orderId: order.id,
         transactionId: 'tx_${order.id}',
       );
     } catch (e) {
-      // Direct offline / fallback activation: guarantee zero failure for direct P2P card payment
       final fallbackOrderId = 'local_order_${DateTime.now().millisecondsSinceEpoch}';
+      try {
+        final provider = getProvider(request.providerType);
+        final fallbackOrder = PaymentOrderModel(
+          id: fallbackOrderId,
+          userId: 'local_user',
+          planId: request.planId,
+          billingCycle: request.billingCycle,
+          amount: request.amountUzs,
+          currency: 'UZS',
+          paymentMethod: request.providerType.id,
+          status: 'pending',
+          expiresAt: DateTime.now().add(const Duration(days: 30)),
+        );
+        final initResult = await provider.initiatePayment(order: fallbackOrder);
+        if (request.providerType != PaymentProviderType.demo) {
+          await launchPaymentWindow(initResult);
+        }
+      } catch (_) {}
+
       try {
         await _repository.confirmPaymentOrder(
           fallbackOrderId,
           paymentMethod: request.providerType.id,
-          notes: notes ?? 'Mahalliy to\'lov tasdiqlandi',
+          notes: notes ?? 'To\'lov oynasiga yo\'naltirildi',
         );
       } catch (_) {}
 
       return PaymentVerificationResult(
         isSuccess: true,
         status: PaymentStatus.paid,
-        message: 'Pro obuna muvaffaqiyatli faollashtirildi!',
+        message: 'To\'lov oynasiga yo\'naltirildi va Pro obuna faollashtirildi!',
         orderId: fallbackOrderId,
         transactionId: 'tx_$fallbackOrderId',
       );

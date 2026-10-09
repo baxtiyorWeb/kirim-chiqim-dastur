@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_dimensions.dart';
@@ -237,28 +236,24 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
             ),
             const SizedBox(height: 14),
 
-            // In-App Direct Humo Card Widget
-            _buildHumoCardWidget(colors),
-            const SizedBox(height: 14),
-
             // Payment Methods Selection (Uzbekistan providers)
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'O\'zbekiston to\'lov usulini tanlang:',
+                'To\'lov usulini tanlang:',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: colors.textPrimary,
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
             _paymentProviderTile(
               provider: PaymentProviderType.click,
               title: 'Click Up',
-              subtitle: 'Click ilovasi yoki kartaga o\'tkazma',
+              subtitle: 'Click ilovasi yoki to\'lov oynasi',
               icon: Icons.touch_app_rounded,
               iconColor: const Color(0xFF0073FF),
               colors: colors,
@@ -268,7 +263,7 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
             _paymentProviderTile(
               provider: PaymentProviderType.payme,
               title: 'Payme',
-              subtitle: 'Payme orqali 9860 6067 5145 9557 kartasiga to\'lov',
+              subtitle: 'Payme ilovasi yoki to\'lov oynasi',
               icon: Icons.payment_rounded,
               iconColor: const Color(0xFF00CCCC),
               colors: colors,
@@ -278,7 +273,7 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
             _paymentProviderTile(
               provider: PaymentProviderType.uzum,
               title: 'Uzum Bank',
-              subtitle: 'Uzum Bank yoki Uzum Nasiya orqali',
+              subtitle: 'Uzum Bank ilovasi yoki to\'lov oynasi',
               icon: Icons.account_balance_wallet_rounded,
               iconColor: const Color(0xFF7000FF),
               colors: colors,
@@ -318,12 +313,21 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.verified_rounded, size: 20),
+                          Icon(
+                            _selectedProvider == PaymentProviderType.demo
+                                ? Icons.flash_on_rounded
+                                : Icons.open_in_new_rounded,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Text(
-                            _selectedProvider == PaymentProviderType.demo
-                                ? 'Sinovdan o\'tkazish'
-                                : 'To\'lov qildim (Pro obunani ochish)',
+                            _selectedProvider == PaymentProviderType.click
+                                ? 'Click to\'lov oynasiga o\'tish'
+                                : _selectedProvider == PaymentProviderType.payme
+                                    ? 'Payme to\'lov oynasiga o\'tish'
+                                    : _selectedProvider == PaymentProviderType.uzum
+                                        ? 'Uzum to\'lov oynasiga o\'tish'
+                                        : 'Sinov tariqasida faollashtirish',
                             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                           ),
                         ],
@@ -439,123 +443,7 @@ class _PaywallSheetState extends ConsumerState<PaywallSheet> {
     );
   }
 
-  Widget _buildHumoCardWidget(dynamic colors) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-        ),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'HUMO',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF10B981),
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'To\'lov kartasi',
-                    style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              const Icon(Icons.contactless_rounded, color: Colors.white54, size: 20),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '9860 6067 5145 9557',
-                style: TextStyle(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 1.5,
-                  fontFamily: 'monospace',
-                ),
-              ),
-              InkWell(
-                onTap: () {
-                  HapticUtil.selection();
-                  Clipboard.setData(const ClipboardData(text: '9860606751459557'));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      backgroundColor: Color(0xFF007A55),
-                      content: Text('Karta raqami nusxalandi: 9860 6067 5145 9557'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.copy_rounded, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
-                      Text('Nusxa', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'To\'lov summasi: ${_isAnnual ? "149 000 so'm/yil" : "19 000 so'm/oy"}',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w700),
-              ),
-              const Text(
-                'Click / Payme',
-                style: TextStyle(fontSize: 11, color: Colors.white54),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Future<void> _handlePurchase() async {
     HapticUtil.medium();

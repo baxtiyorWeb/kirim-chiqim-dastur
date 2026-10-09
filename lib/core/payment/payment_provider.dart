@@ -39,19 +39,18 @@ class ClickPaymentProvider implements PaymentProvider {
   String get displayName => 'Click Up';
 
   @override
-  String get subtitle => 'Click ilovasi yoki bank kartasi orqali to\'lov';
+  String get subtitle => 'Click ilovasi yoki to\'lov oynasi orqali to\'lash';
 
   @override
   Future<PaymentInitiateResult> initiatePayment({
     required PaymentOrderModel order,
   }) async {
-    // Direct in-app P2P deep link to user's Humo card (9860 6067 5145 9557)
     final clickUrl = 'https://my.click.uz/services/p2p?card=9860606751459557&amount=${order.amount}';
     return PaymentInitiateResult(
       orderId: order.id,
       paymentUrl: clickUrl,
       deepLink: 'clickuz://p2p?card=9860606751459557&amount=${order.amount}',
-      instructions: 'Click ilovasi ochiladi, kartaga 149 000 so\'m o\'tkaziladi va ilovada Pro bir zumda faollashadi.',
+      instructions: 'Click to\'lov oynasi ochilmoqda...',
       requiresExternalAction: false,
     );
   }
@@ -85,7 +84,7 @@ class PaymePaymentProvider implements PaymentProvider {
   String get displayName => 'Payme';
 
   @override
-  String get subtitle => 'Payme orqali 9860 6067 5145 9557 kartasiga to\'lov';
+  String get subtitle => 'Payme ilovasi yoki to\'lov oynasi orqali to\'lash';
 
   @override
   Future<PaymentInitiateResult> initiatePayment({
@@ -96,7 +95,7 @@ class PaymePaymentProvider implements PaymentProvider {
       orderId: order.id,
       paymentUrl: paymeUrl,
       deepLink: 'payme://p2p?card=9860606751459557&amount=${order.amount}',
-      instructions: 'Payme orqali to\'lov qiling va Pro obunani faollashtiring.',
+      instructions: 'Payme to\'lov oynasi ochilmoqda...',
       requiresExternalAction: false,
     );
   }
