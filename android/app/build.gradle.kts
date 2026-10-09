@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.example.thego_getters"
     compileSdk = flutter.compileSdkVersion
-    // ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -34,16 +34,7 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
-            ndk {
-                debugSymbolLevel = "none"
-            }
         }
-    }
-}
-
-tasks.configureEach {
-    if (name.contains("extractReleaseNativeSymbolTables", ignoreCase = true)) {
-        enabled = false
     }
 }
 

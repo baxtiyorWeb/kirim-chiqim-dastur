@@ -698,8 +698,9 @@ class SubscriptionNotifier extends Notifier<SubscriptionDetailsModel> {
 
   Future<void> refresh() async {
     final repo = ref.read(financeRepositoryProvider);
+    final storage = ref.read(localStorageProvider);
     if (!repo.isAuthenticated) {
-      state = SubscriptionDetailsModel.createDefault(isPro: false);
+      state = SubscriptionDetailsModel.createDefault(isPro: storage.isProMember);
       return;
     }
     final currentGen = ++_requestGeneration;

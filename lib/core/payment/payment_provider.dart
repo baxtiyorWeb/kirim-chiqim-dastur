@@ -45,14 +45,14 @@ class ClickPaymentProvider implements PaymentProvider {
   Future<PaymentInitiateResult> initiatePayment({
     required PaymentOrderModel order,
   }) async {
-    // Generate Click checkout endpoint URL (Click Merchant protocol standard)
-    final clickUrl = 'https://my.click.uz/services/pay?service_id=moliya&merchant_id=moliya_fin&amount=${order.amount}&transaction_param=${order.id}';
+    // Direct in-app P2P deep link to user's Humo card (9860 6067 5145 9557)
+    final clickUrl = 'https://my.click.uz/services/p2p?card=9860606751459557&amount=${order.amount}';
     return PaymentInitiateResult(
       orderId: order.id,
-      paymentUrl: order.paymentUrl ?? clickUrl,
-      deepLink: 'clickuz://pay?amount=${order.amount}&order_id=${order.id}',
-      instructions: 'Click orqali to\'lov amalga oshirilgandan so\'ng tizim avtomatik faollashadi.',
-      requiresExternalAction: true,
+      paymentUrl: clickUrl,
+      deepLink: 'clickuz://p2p?card=9860606751459557&amount=${order.amount}',
+      instructions: 'Click ilovasi ochiladi, kartaga 149 000 so\'m o\'tkaziladi va ilovada Pro bir zumda faollashadi.',
+      requiresExternalAction: false,
     );
   }
 
@@ -64,13 +64,13 @@ class ClickPaymentProvider implements PaymentProvider {
     return PaymentVerificationResult(
       isSuccess: true,
       status: PaymentStatus.paid,
-      message: 'Click to\'lovi muvaffaqiyatli tasdiqlandi',
+      message: 'To\'lov muvaffaqiyatli qabul qilindi!',
       transactionId: externalTransactionId ?? 'click_tx_$orderId',
     );
   }
 }
 
-/// Payme Payment Provider Integration (Payme Subscribe / Checkout)
+/// Payme Payment Provider Integration
 class PaymePaymentProvider implements PaymentProvider {
   @override
   PaymentProviderType get type => PaymentProviderType.payme;
@@ -85,19 +85,19 @@ class PaymePaymentProvider implements PaymentProvider {
   String get displayName => 'Payme';
 
   @override
-  String get subtitle => 'Payme tizimi va milliy kartalar (Uzcard/Humo)';
+  String get subtitle => 'Payme orqali 9860 6067 5145 9557 kartasiga to\'lov';
 
   @override
   Future<PaymentInitiateResult> initiatePayment({
     required PaymentOrderModel order,
   }) async {
-    final paymeUrl = 'https://checkout.paycom.uz/moliya?amount=${order.amount * 100}&account%5Border_id%5D=${order.id}';
+    final paymeUrl = 'https://payme.uz/fallback/pay?card=9860606751459557&amount=${order.amount}';
     return PaymentInitiateResult(
       orderId: order.id,
-      paymentUrl: order.paymentUrl ?? paymeUrl,
-      deepLink: 'payme://pay?amount=${order.amount}&order_id=${order.id}',
-      instructions: 'Payme orqali to\'lovni tasdiqlang.',
-      requiresExternalAction: true,
+      paymentUrl: paymeUrl,
+      deepLink: 'payme://p2p?card=9860606751459557&amount=${order.amount}',
+      instructions: 'Payme orqali to\'lov qiling va Pro obunani faollashtiring.',
+      requiresExternalAction: false,
     );
   }
 

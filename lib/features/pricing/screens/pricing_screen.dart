@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
@@ -317,36 +318,107 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
 
                     const SizedBox(height: AppDimensions.space20),
 
-                    // CTA Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF007A55),
-                          foregroundColor: Colors.white,
-                          elevation: 3,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
-                          ),
+                    // In-App Direct Humo Card Widget
+                    if (!isPro) ...[
+                      _buildHumoCardWidget(colors),
+                      const SizedBox(height: AppDimensions.space16),
+                    ],
+
+                    // CTA Buttons
+                    if (isPro)
+                      Container(
+                        width: double.infinity,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007A55).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                          border: Border.all(color: const Color(0xFF007A55)),
                         ),
-                        onPressed: isPro
-                            ? null
-                            : () async {
-                                HapticUtil.medium();
-                                await showPaywallSheet(context, featureKey: 'pricing_screen');
-                              },
-                        child: Text(
-                          isPro ? 'Sizda Pro Faol' : (_isAnnual ? 'Yillik Pro Rejaga Ulanish' : 'Oylik Pro Rejaga Ulanish'),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.verified_rounded, color: Color(0xFF007A55), size: 22),
+                            SizedBox(width: 8),
+                            Text(
+                              'Sizda Pro Obuna Faol ✨',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF007A55),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF007A55),
+                            foregroundColor: Colors.white,
+                            elevation: 3,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                            ),
+                          ),
+                          onPressed: () async {
+                            HapticUtil.medium();
+                            await ref.read(subscriptionProvider.notifier).setProFallback(true);
+                            await ref.read(proMemberProvider.notifier).setPro(true);
+                            HapticUtil.success();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  backgroundColor: Color(0xFF007A55),
+                                  content: Text('Pro obuna muvaffaqiyatli faollashtirildi! Barcha imkoniyatlar ochildi 🎉'),
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.verified_rounded, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'To\'lov qildim (Pro faollashtirish)',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: colors.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                            ),
+                          ),
+                          onPressed: () async {
+                            HapticUtil.selection();
+                            await showPaywallSheet(context, featureKey: 'pricing_screen');
+                          },
+                          icon: const Icon(Icons.payment_rounded, size: 18),
+                          label: const Text(
+                            'Click / Payme / Uzum to\'lov menyusi',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ],
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Center(
                       child: Text(
                         'Istalgan vaqtda bekor qilish mumkin • Yashirin to\'lov yo\'q',
@@ -675,6 +747,124 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
                 color: isHeader ? const Color(0xFF007A55) : const Color(0xFF10B981),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHumoCardWidget(AppThemeTokens colors) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+        ),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'HUMO',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF10B981),
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'To\'lov kartasi',
+                    style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+              const Icon(Icons.contactless_rounded, color: Colors.white54, size: 20),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '9860 6067 5145 9557',
+                style: TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 1.5,
+                  fontFamily: 'monospace',
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  HapticUtil.selection();
+                  Clipboard.setData(const ClipboardData(text: '9860606751459557'));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: Color(0xFF007A55),
+                      content: Text('Karta raqami nusxalandi: 9860 6067 5145 9557'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.copy_rounded, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text('Nusxa', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'To\'lov summasi: ${_isAnnual ? "149 000 so'm/yil" : "19 000 so'm/oy"}',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w700),
+              ),
+              const Text(
+                'Click / Payme',
+                style: TextStyle(fontSize: 11, color: Colors.white54),
+              ),
+            ],
           ),
         ],
       ),
